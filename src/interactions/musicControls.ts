@@ -64,12 +64,14 @@ export async function handleMusicControl(
   switch (action) {
     case "pause": {
       const changed = await player.pause();
+      if (changed) await refreshNowPlaying(player);
       await replyPrivate(interaction, changed ? "⏸ Lecture mise en pause." : "ℹ️ La lecture n'est pas en cours.");
       return true;
     }
 
     case "resume": {
       const changed = await player.resume();
+      if (changed) await refreshNowPlaying(player);
       await replyPrivate(interaction, changed ? "▶️ Lecture reprise." : "ℹ️ La lecture n'est pas en pause.");
       return true;
     }

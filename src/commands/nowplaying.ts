@@ -24,7 +24,7 @@ export const nowplaying: CommandDefinition = {
 
     const message = await interaction.reply({
       embeds: [nowPlayingEmbed(player)],
-      components: playbackControlsRows(player.channelId),
+      components: playbackControlsRows(player.channelId, player.state === "PAUSED"),
       fetchReply: true,
     });
 

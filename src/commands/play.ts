@@ -1,7 +1,7 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { env } from "../config/env";
 import { playbackControlsRows } from "../ui/controls";
-import { trackEmbed } from "../ui/embeds";
+import { nowPlayingEmbed, queuedEmbed } from "../ui/embeds";
 import { canJoinAndSpeak, ensureNoOtherGuildSession, memberVoiceChannel } from "./helpers";
 import { importPlaylist } from "./playlistImport";
 import type { CommandDefinition } from "./types";
@@ -65,13 +65,12 @@ export const play: CommandDefinition = {
 
       if (result.started) {
         await interaction.editReply({
-          embeds: [trackEmbed("🎵 Lecture en cours", track, player.volume)],
-          components: playbackControlsRows(player.channelId),
+          embeds: [nowPlayingEmbed(player)],
+          components: playbackControlsRows(player.channelId, player.state === "PAUSED"),
         });
       } else {
         await interaction.editReply({
-          content: `✅ Ajouté à la file d'attente — position #${result.position}`,
-          embeds: [trackEmbed("🎵 Ajouté", track)],
+          embeds: [queuedEmbed(track, { position: result.position })],
         });
       }
     } catch (error) {

@@ -1,4 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
+import { playbackControlsRows } from "../ui/controls";
+import { nowPlayingEmbed, queuedEmbed } from "../ui/embeds";
 import { canJoinAndSpeak, ensureNoOtherGuildSession, memberVoiceChannel } from "./helpers";
 import type { CommandDefinition } from "./types";
 
@@ -53,11 +55,14 @@ export const playnext: CommandDefinition = {
       }
       const result = await player.playNext(track);
 
-      await interaction.editReply(
-        result.started
-          ? `▶️ Lecture immédiate de **${track.title}**.`
-          : `⏭ **${track.title}** sera joué juste après le morceau actuel.`,
-      );
+      if (result.started) {
+        await interaction.editReply({
+          embeds: [nowPlayingEmbed(player)],
+          components: playbackControlsRows(player.channelId, player.state === "PAUSED"),
+        });
+      } else {
+        await interaction.editReply({ embeds: [queuedEmbed(track, { pending: true })] });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
       await interaction.editReply(`❌ Impossible d'ajouter ce morceau : ${message}`);

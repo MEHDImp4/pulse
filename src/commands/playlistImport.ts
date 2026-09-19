@@ -1,5 +1,6 @@
 import type { ChatInputCommandInteraction, VoiceBasedChannel } from "discord.js";
 import type { PlayerManager } from "../music/PlayerManager";
+import { playlistImportedEmbed } from "../ui/embeds";
 
 /** Resolves a playlist URL and enqueues as many tracks as fit. Assumes the interaction is deferred. */
 export async function importPlaylist(
@@ -42,10 +43,17 @@ export async function importPlaylist(
       }
     }
 
-    const prefix = result.title ? `**${result.title}** — ` : "";
-    const capped = result.tracks.length >= limit ? ` (limite : ${limit})` : "";
-    const partial = added < result.tracks.length ? " (certains morceaux n'ont pas pu être ajoutés)" : "";
-    await interaction.editReply(`✅ ${prefix}${added} morceau(x) ajouté(s) à la file${capped}${partial}.`);
+    await interaction.editReply({
+      embeds: [
+        playlistImportedEmbed({
+          title: result.title,
+          added,
+          limit,
+          partial: added < result.tracks.length,
+          limitReached: result.tracks.length >= limit,
+        }),
+      ],
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur inconnue";
     await interaction.editReply(`❌ Impossible d'importer la playlist : ${message}`);

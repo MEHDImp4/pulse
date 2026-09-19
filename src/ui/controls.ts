@@ -65,18 +65,24 @@ export function parseQueuePage(customId: string): { channelId: string; page: num
   return { channelId, page };
 }
 
-export function musicControlsRow(channelId: string): ActionRowBuilder<ButtonBuilder> {
+/** Pause and resume are a single toggle button rendered from the current state. */
+function playPauseButton(channelId: string, isPaused: boolean): ButtonBuilder {
+  return isPaused
+    ? new ButtonBuilder()
+        .setCustomId(musicControlId(channelId, "resume"))
+        .setEmoji("▶️")
+        .setLabel("Reprendre")
+        .setStyle(ButtonStyle.Success)
+    : new ButtonBuilder()
+        .setCustomId(musicControlId(channelId, "pause"))
+        .setEmoji("⏸️")
+        .setLabel("Pause")
+        .setStyle(ButtonStyle.Secondary);
+}
+
+export function musicControlsRow(channelId: string, isPaused = false): ActionRowBuilder<ButtonBuilder> {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(musicControlId(channelId, "pause"))
-      .setEmoji("⏸️")
-      .setLabel("Pause")
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId(musicControlId(channelId, "resume"))
-      .setEmoji("▶️")
-      .setLabel("Reprendre")
-      .setStyle(ButtonStyle.Success),
+    playPauseButton(channelId, isPaused),
     new ButtonBuilder()
       .setCustomId(musicControlId(channelId, "skip"))
       .setEmoji("⏭️")
@@ -87,26 +93,6 @@ export function musicControlsRow(channelId: string): ActionRowBuilder<ButtonBuil
       .setEmoji("⏹️")
       .setLabel("Arrêter")
       .setStyle(ButtonStyle.Danger),
-  );
-}
-
-export function audioControlsRow(channelId: string): ActionRowBuilder<ButtonBuilder> {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(musicControlId(channelId, "voteskip"))
-      .setEmoji("🗳️")
-      .setLabel("Voter pour passer")
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId(musicControlId(channelId, "seekback"))
-      .setEmoji("⏪")
-      .setLabel(`-${env.seekStepSeconds}s`)
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId(musicControlId(channelId, "seekforward"))
-      .setEmoji("⏩")
-      .setLabel(`+${env.seekStepSeconds}s`)
-      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(musicControlId(channelId, "voldown"))
       .setEmoji("🔉")
@@ -120,8 +106,28 @@ export function audioControlsRow(channelId: string): ActionRowBuilder<ButtonBuil
   );
 }
 
-export function playbackControlsRows(channelId: string): ActionRowBuilder<ButtonBuilder>[] {
-  return [musicControlsRow(channelId), audioControlsRow(channelId)];
+export function audioControlsRow(channelId: string): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(musicControlId(channelId, "voteskip"))
+      .setEmoji("🗳️")
+      .setLabel("Vote")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(musicControlId(channelId, "seekback"))
+      .setEmoji("⏪")
+      .setLabel(`-${env.seekStepSeconds}s`)
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(musicControlId(channelId, "seekforward"))
+      .setEmoji("⏩")
+      .setLabel(`+${env.seekStepSeconds}s`)
+      .setStyle(ButtonStyle.Secondary),
+  );
+}
+
+export function playbackControlsRows(channelId: string, isPaused = false): ActionRowBuilder<ButtonBuilder>[] {
+  return [musicControlsRow(channelId, isPaused), audioControlsRow(channelId)];
 }
 
 export function queueControlsRow(
