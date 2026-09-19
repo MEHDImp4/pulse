@@ -119,7 +119,9 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
   }
 });
 
-const stopNowPlayingUpdater = env.nowPlayingLive ? startNowPlayingUpdater(players) : () => undefined;
+const stopNowPlayingUpdater = env.nowPlayingLive
+  ? startNowPlayingUpdater(players, env.nowPlayingIntervalMs)
+  : () => undefined;
 
 const shutdown = createShutdown({ client, players, logger });
 

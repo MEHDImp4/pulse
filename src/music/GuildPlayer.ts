@@ -86,6 +86,7 @@ export class GuildPlayer {
   private readonly history: Track[] = [];
   private readonly skipVotes = new Set<string>();
   private _nowPlayingMessage?: Message;
+  private _nowPlayingIdle = false;
 
   constructor(
     readonly guildId: string,
@@ -256,6 +257,16 @@ export class GuildPlayer {
 
   setNowPlayingMessage(message: Message | undefined): void {
     this._nowPlayingMessage = message;
+    this._nowPlayingIdle = false;
+  }
+
+  /** True once the live card has been switched to its idle placeholder. */
+  get nowPlayingIdle(): boolean {
+    return this._nowPlayingIdle;
+  }
+
+  set nowPlayingIdle(value: boolean) {
+    this._nowPlayingIdle = value;
   }
 
   async connect(channel: VoiceBasedChannel): Promise<void> {
@@ -765,7 +776,14 @@ export class GuildPlayer {
     this._currentTrack = undefined;
     this._lastTextChannelId = undefined;
     this.currentResource = undefined;
+    const nowPlaying = this._nowPlayingMessage;
     this._nowPlayingMessage = undefined;
+    this._nowPlayingIdle = false;
+    if (nowPlaying) {
+      void nowPlaying.delete().catch((error) => {
+        logger.debug({ err: error, guild: this.guildId }, "Now playing card cleanup failed");
+      });
+    }
     this.skipVotes.clear();
     await this.killProcesses();
     this.audioPlayer.stop(true);

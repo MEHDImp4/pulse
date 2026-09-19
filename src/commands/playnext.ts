@@ -56,10 +56,11 @@ export const playnext: CommandDefinition = {
       const result = await player.playNext(track);
 
       if (result.started) {
-        await interaction.editReply({
+        const message = await interaction.editReply({
           embeds: [nowPlayingEmbed(player)],
           components: playbackControlsRows(player.channelId, player.state === "PAUSED"),
         });
+        player.setNowPlayingMessage(message);
       } else {
         await interaction.editReply({ embeds: [queuedEmbed(track, { pending: true })] });
       }
