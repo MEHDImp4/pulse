@@ -117,7 +117,7 @@ All variables are optional unless stated otherwise.
 | `YTDLP_COOKIES_FILE` | — | `yt-dlp` cookies (restricted / anti-bot videos) |
 | `YTDLP_AUTO_UPDATE` | `true` | Update `yt-dlp` on container start |
 | `NOWPLAYING_LIVE` | `true` | Refresh the progress bar |
-| `NOWPLAYING_INTERVAL_MS` | `5000` | Now-playing card refresh interval (ms) |
+| `NOWPLAYING_INTERVAL_MS` | `1000` | Now-playing card refresh interval (ms) |
 | `VOTE_SKIP_MIN` / `VOTE_SKIP_RATIO` | `2` / `0.5` | Vote-skip threshold |
 | `VOLUME_STEP` | `5` | Volume button step |
 | `SEEK_STEP_SECONDS` | `10` | Seek button step (⏪/⏩) |

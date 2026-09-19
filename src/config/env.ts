@@ -50,7 +50,7 @@ export const env = {
   commandCooldownSeconds: intEnv("COMMAND_COOLDOWN_SECONDS", 5),
   autoDeleteSeconds: intEnv("AUTO_DELETE_SECONDS", 1),
   nowPlayingLive: boolEnv("NOWPLAYING_LIVE", true),
-  nowPlayingIntervalMs: intEnv("NOWPLAYING_INTERVAL_MS", 5_000),
+  nowPlayingIntervalMs: intEnv("NOWPLAYING_INTERVAL_MS", 1_000),
   voteSkipMin: intEnv("VOTE_SKIP_MIN", 2),
   voteSkipRatio: floatEnv("VOTE_SKIP_RATIO", 0.5),
   volumeStep: intEnv("VOLUME_STEP", 5),
