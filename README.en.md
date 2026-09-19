@@ -24,12 +24,12 @@
 - 📃 **Per-server queue** (no cross-guild mixing) with **pagination**
 - 🎧 **One voice session per server**: Discord allows a bot in only one voice channel per server; several servers can run in parallel, with independent queues and settings
 - 📚 **YouTube playlists**: import by URL (`/playlist` or `/play` with a playlist link)
-- ♾️ **Autoplay**: chains related tracks when the queue runs out (`/autoplay`)
+- ♾️ **Radio (autoplay)**: on by default, chains related tracks when the queue empties; member-queued tracks stay first (`/autoplay` to disable)
 - 🎛️ **Audio filters**: bassboost, nightcore, vaporwave, 8D, treble, loudness normalization (`/filter`)
 - 🎤 **Synced lyrics** via lrclib (`/lyrics`)
 - 📊 **Observability**: `/status` (uptime, active sessions, voice latency, memory)
 - ⏩ **Seek** and **previous track**: navigate within a track (`/seek`, `/previous`, ⏪/⏩ buttons)
-- 💾 **Queue persistence**: per-channel queues resume after a restart
+- 💾 **Persistence & resume**: per-channel queues, and the bot rejoins and resumes its session after a restart
 - 🔁 **Loop** track / queue, 🔀 **shuffle**, ⏭ **play next** (`/playnext`)
 - ⏯️ **Button controls**: pause, resume, skip, stop, vote-skip, volume
 - 📊 **Live progress** in `/nowplaying` (bar + elapsed/total time)
@@ -126,10 +126,15 @@ All variables are optional unless stated otherwise.
 | `VOLUME_HEADROOM_DB` / `VOLUME_RANGE_DB` | `3` / `30` | Perceptual volume curve (dB) |
 | `AUTOCOMPLETE_ENABLED` | `true` | Autocomplete on `/play` |
 | `PLAYLIST_MAX_ITEMS` | `50` | Max tracks imported per playlist |
-| `AUTOPLAY_DEFAULT` | `false` | Autoplay enabled by default for new channels |
-| `AUTOPLAY_MAX_CONSECUTIVE` | `10` | Max tracks chained automatically |
+| `AUTOPLAY_DEFAULT` | `true` | Autoplay (radio) on by default: chains related tracks when the queue empties |
+| `AUTOPLAY_MAX_CONSECUTIVE` | `1000` | Cap on chained tracks (0 = unlimited) |
+| `AUTOPLAY_HISTORY` | `100` | Number of recent tracks excluded when picking the next one |
+| `AUTOPLAY_RETRY_MS` | `30000` | Retry delay when autoplay finds nothing (stays connected) |
+| `AUTOPLAY_EMPTY_TIMEOUT_SECONDS` | `1800` | Empty-channel disconnect delay while autoplay is active |
 | `QUEUE_PERSIST` | `true` | Persist per-channel queues to resume after a restart |
 | `QUEUE_PERSIST_DEBOUNCE_MS` | `1000` | Write debounce for persisted queues |
+| `RESUME_ON_STARTUP` | `true` | Rejoin the last channel and resume the session on startup |
+| `RESUME_MAX_AGE_MINUTES` | `1440` | Only resume sessions saved within the last N minutes |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | — | Spotify credentials (enables Spotify → YouTube link resolution) |
 | `LYRICS_ENABLED` | `true` | Enable `/lyrics` |
 | `LYRICS_API_BASE` | `https://lrclib.net` | Lyrics API base URL |

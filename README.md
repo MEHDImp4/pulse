@@ -24,12 +24,12 @@
 - 📃 **File d'attente par serveur** (aucun mélange entre guildes) avec **pagination**
 - 🎧 **Une session vocale par serveur** : Discord n'autorise qu'un salon vocal par bot et par serveur ; plusieurs serveurs peuvent tourner en parallèle, avec files et réglages indépendants
 - 📚 **Playlists YouTube** : import par URL (`/playlist` ou `/play` avec un lien de playlist)
-- ♾️ **Autoplay** : enchaîne des titres similaires quand la file se vide (`/autoplay`)
+- ♾️ **Radio (autoplay)** : activé par défaut, enchaîne des titres similaires quand la file se vide ; les titres ajoutés par les membres restent prioritaires (`/autoplay` pour couper)
 - 🎛️ **Filtres audio** : bassboost, nightcore, vaporwave, 8D, treble, normalisation (`/filter`)
 - 🎤 **Paroles synchronisées** via lrclib (`/lyrics`)
 - 📊 **Observabilité** : `/status` (uptime, sessions actives, latence voix, mémoire)
 - ⏩ **Seek** et **morceau précédent** : navigation dans le morceau (`/seek`, `/previous`, boutons ⏪/⏩)
-- 💾 **Persistance de la file** : reprise des files par salon après un redémarrage
+- 💾 **Persistance & reprise** : files par salon, et le bot rejoint et reprend sa session après un redémarrage
 - 🔁 **Boucle** morceau / file, 🔀 **shuffle**, ⏭ **insertion en tête** (`/playnext`)
 - ⏯️ **Contrôles par boutons** : pause, reprise, suivant, stop, vote-skip, volume ±
 - 📊 **Progression en direct** dans `/nowplaying` (barre + temps écoulé/total)
@@ -124,10 +124,15 @@ Toutes les variables sont optionnelles sauf mention contraire.
 | `VOLUME_HEADROOM_DB` / `VOLUME_RANGE_DB` | `3` / `30` | Courbe de volume perceptuelle (dB) |
 | `AUTOCOMPLETE_ENABLED` | `true` | Autocomplétion sur `/play` |
 | `PLAYLIST_MAX_ITEMS` | `50` | Nombre max de morceaux importés par playlist |
-| `AUTOPLAY_DEFAULT` | `false` | Autoplay activé par défaut sur les nouveaux salons |
-| `AUTOPLAY_MAX_CONSECUTIVE` | `10` | Nombre max de titres enchaînés automatiquement |
+| `AUTOPLAY_DEFAULT` | `true` | Autoplay (radio) activé par défaut : enchaîne des titres similaires quand la file est vide |
+| `AUTOPLAY_MAX_CONSECUTIVE` | `1000` | Plafond de titres enchaînés (0 = illimité) |
+| `AUTOPLAY_HISTORY` | `100` | Nombre de titres récents exclus lors du choix du suivant |
+| `AUTOPLAY_RETRY_MS` | `30000` | Délai entre deux tentatives quand l'autoplay ne trouve rien (reste connecté) |
+| `AUTOPLAY_EMPTY_TIMEOUT_SECONDS` | `1800` | Délai avant déconnexion d'un salon vide quand l'autoplay est actif |
 | `QUEUE_PERSIST` | `true` | Persiste les files par salon pour une reprise après redémarrage |
 | `QUEUE_PERSIST_DEBOUNCE_MS` | `1000` | Délai d'écriture des files persistées |
+| `RESUME_ON_STARTUP` | `true` | Rejoint le dernier salon et reprend la session au démarrage |
+| `RESUME_MAX_AGE_MINUTES` | `1440` | Ne reprend que les sessions enregistrées depuis moins de N minutes |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | — | Credentials Spotify (active la résolution des liens Spotify → YouTube) |
 | `LYRICS_ENABLED` | `true` | Active `/lyrics` |
 | `LYRICS_API_BASE` | `https://lrclib.net` | Base de l'API de paroles |

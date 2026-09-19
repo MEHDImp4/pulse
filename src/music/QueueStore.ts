@@ -10,6 +10,8 @@ const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 export interface PersistedQueue {
   guildId: string;
   channelId: string;
+  /** Last text channel used for the now-playing card, so it can be reposted on resume. */
+  textChannelId?: string;
   current?: Track;
   tracks: Track[];
   savedAt: number;
@@ -59,6 +61,7 @@ export function sanitizePersistedQueue(value: unknown): PersistedQueue | undefin
   return {
     guildId: raw.guildId,
     channelId: raw.channelId,
+    textChannelId: typeof raw.textChannelId === "string" ? raw.textChannelId : undefined,
     current: raw.current ? sanitizeTrack(raw.current) : undefined,
     tracks,
     savedAt: typeof raw.savedAt === "number" ? raw.savedAt : Date.now(),
@@ -98,6 +101,11 @@ export class QueueStore {
 
   get(sessionId: string): PersistedQueue | undefined {
     return this.sessions.get(sessionId);
+  }
+
+  /** Snapshot of every persisted session (copy), safe to iterate while deleting. */
+  entries(): [string, PersistedQueue][] {
+    return [...this.sessions.entries()];
   }
 
   set(sessionId: string, entry: Omit<PersistedQueue, "savedAt">): void {

@@ -36,6 +36,7 @@ void verifyExternalTools();
 
 client.once(Events.ClientReady, (readyClient) => {
   logger.info({ user: readyClient.user.tag, guilds: readyClient.guilds.cache.size }, "Discord client ready");
+  if (env.resumeOnStartup) void players.resumeSessionsOnStartup();
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

@@ -3,6 +3,8 @@ import type { Client } from "discord.js";
 import { env } from "../config/env";
 import type { AudioProvider, PlaylistResult } from "../providers/AudioProvider";
 import { isPlaylistUrl } from "../providers/youtube";
+import { playbackControlsRows } from "../ui/controls";
+import { nowPlayingEmbed } from "../ui/embeds";
 import { logger } from "../utils/logger";
 import { GuildPlayer } from "./GuildPlayer";
 import { GuildSettingsStore, type GuildSettings } from "./GuildSettingsStore";
@@ -128,6 +130,7 @@ export class PlayerManager {
     this.queueStore.set(player.sessionId, {
       guildId: player.guildId,
       channelId: player.channelId,
+      textChannelId: player.lastTextChannelId,
       current,
       tracks,
     });
@@ -142,6 +145,72 @@ export class PlayerManager {
       }
     } catch (error) {
       logger.warn({ err: error, channelId }, "Failed to deliver notification");
+    }
+  }
+
+  /**
+   * Rejoins recent persisted sessions and resumes playback after a restart.
+   * Sessions whose guild/channel is gone are dropped instead of retried.
+   */
+  async resumeSessionsOnStartup(): Promise<void> {
+    if (!this.queueStore || !this.client) return;
+
+    const cutoff = Date.now() - env.resumeMaxAgeMinutes * 60_000;
+
+    for (const [sessionId, entry] of this.queueStore.entries()) {
+      if (entry.savedAt < cutoff || (entry.tracks.length === 0 && !entry.current)) {
+        this.queueStore.delete(sessionId);
+        continue;
+      }
+
+      try {
+        const guild = await this.client.guilds.fetch(entry.guildId).catch(() => null);
+        if (!guild) {
+          this.queueStore.delete(sessionId);
+          continue;
+        }
+
+        const channel = await guild.channels.fetch(entry.channelId).catch(() => null);
+        if (!channel || !channel.isVoiceBased()) {
+          logger.warn(
+            { guild: entry.guildId, channel: entry.channelId },
+            "Persisted session channel unavailable, dropping",
+          );
+          this.queueStore.delete(sessionId);
+          continue;
+        }
+
+        const player = this.getOrCreate(entry.guildId, entry.channelId);
+        if (entry.textChannelId) player.lastTextChannelId = entry.textChannelId;
+        await player.connect(channel);
+        const resumed = await player.resumeFromQueue();
+        logger.info(
+          { guild: entry.guildId, channel: entry.channelId, resumed },
+          "Resumed persisted session",
+        );
+        if (resumed) await this.announceNowPlaying(player);
+      } catch (error) {
+        logger.warn(
+          { err: error, guild: entry.guildId, channel: entry.channelId },
+          "Failed to resume persisted session",
+        );
+      }
+    }
+  }
+
+  /** Best-effort repost of the now-playing card in the last known text channel. */
+  private async announceNowPlaying(player: GuildPlayer): Promise<void> {
+    if (!this.client || !player.lastTextChannelId || !player.currentTrack) return;
+    try {
+      const channel = await this.client.channels.fetch(player.lastTextChannelId).catch(() => null);
+      if (!channel?.isTextBased() || channel.isDMBased()) return;
+      const message = await channel.send({
+        embeds: [nowPlayingEmbed(player)],
+        components: playbackControlsRows(player.channelId, player.state === "PAUSED"),
+      });
+      player.setNowPlayingMessage(message);
+    } catch (error) {
+      logger.warn({ err: error, guild: player.guildId }, "Failed to announce resumed now-playing card");
     }
   }
 

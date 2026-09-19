@@ -69,6 +69,7 @@ export class GuildPlayer {
   private currentResource?: AudioResource;
   private idleTimer?: NodeJS.Timeout;
   private emptyChannelTimer?: NodeJS.Timeout;
+  private autoplayRetryTimer?: NodeJS.Timeout;
   private serial: Promise<unknown> = Promise.resolve();
   private destroyed = false;
   private bypassLoop = false;
@@ -364,6 +365,7 @@ export class GuildPlayer {
   async add(track: Track): Promise<AddTrackResult> {
     return this.runExclusive(async () => {
       this.clearIdleTimer();
+      this.clearAutoplayRetry();
       this.autoplayCount = 0;
       if (!this._currentTrack && this.audioPlayer.state.status === AudioPlayerStatus.Idle) {
         await this.startTrack(track);
@@ -380,6 +382,7 @@ export class GuildPlayer {
   async playNext(track: Track): Promise<AddTrackResult> {
     return this.runExclusive(async () => {
       this.clearIdleTimer();
+      this.clearAutoplayRetry();
       this.autoplayCount = 0;
       if (!this._currentTrack && this.audioPlayer.state.status === AudioPlayerStatus.Idle) {
         await this.startTrack(track);
@@ -390,6 +393,21 @@ export class GuildPlayer {
       logger.info({ guild: this.guildId, track: track.title }, "Queued next");
       this.notifyQueueChange();
       return { started: false, position };
+    });
+  }
+
+  /**
+   * Resumes playback from the in-memory queue (used after a restart). No-op if
+   * a track is already playing or the connection is not ready.
+   */
+  async resumeFromQueue(): Promise<boolean> {
+    return this.runExclusive(async () => {
+      if (this.destroyed) return false;
+      if (!this.connection || this.connection.state.status !== VoiceConnectionStatus.Ready) return false;
+      if (this._currentTrack || this.audioPlayer.state.status !== AudioPlayerStatus.Idle) return true;
+      this.clearAutoplayRetry();
+      await this.playNextInternal();
+      return this._currentTrack !== undefined;
     });
   }
 
@@ -546,6 +564,7 @@ export class GuildPlayer {
       this.skipVotes.clear();
       this.bypassLoop = true;
       this.autoplayCount = 0;
+      this.clearAutoplayRetry();
       await this.killProcesses();
       this.audioPlayer.stop(true);
       this._state = "IDLE";
@@ -560,9 +579,14 @@ export class GuildPlayer {
 
   handleHumansEmpty(): void {
     if (this.emptyChannelTimer || this.destroyed) return;
+    // With autoplay ("radio") the bot keeps serving an empty channel for a
+    // longer grace period before giving up.
+    const timeoutSeconds = this._autoplay
+      ? env.autoplayEmptyTimeoutSeconds
+      : env.emptyChannelTimeoutSeconds;
     this.emptyChannelTimer = setTimeout(() => {
       void this.runExclusive(async () => this.destroyInternal());
-    }, env.emptyChannelTimeoutSeconds * 1000);
+    }, timeoutSeconds * 1000);
   }
 
   handleHumansPresent(): void {
@@ -570,16 +594,22 @@ export class GuildPlayer {
   }
 
   private async playNextInternal(finished?: Track): Promise<void> {
+    // `seed` feeds autoplay lookups; `previous` drives loop semantics.
+    const seed = finished;
     let previous = finished;
     // Each pass consumes one queue entry or one autoplay slot; the cap guards
     // against an unexpected retry cycle instead of recursing per failure.
-    const maxPasses = env.maxQueueSize + env.autoplayMaxConsecutive + 1;
+    const maxPasses = env.maxQueueSize + Math.max(1, env.autoplayMaxConsecutive) + 1;
+
+    let autoplayFailures = 0;
 
     for (let pass = 0; pass < maxPasses; pass++) {
       let next = decideNext(previous, this._loopMode, this.queue);
+      let usedAutoplay = false;
 
-      if (!next && previous && this._autoplay) {
-        next = await this.resolveAutoplay(previous);
+      if (!next && seed && this._autoplay) {
+        next = await this.resolveAutoplay(seed);
+        usedAutoplay = next !== undefined;
       }
 
       if (!next) break;
@@ -591,19 +621,85 @@ export class GuildPlayer {
         logger.warn({ err: error, guild: this.guildId, track: next.title }, "Skipping unreadable track");
         this._currentTrack = undefined;
         previous = undefined;
+        // Do not hammer the related-track lookup when autoplay keeps failing.
+        if (usedAutoplay && ++autoplayFailures >= 3) break;
       }
     }
 
+    // User tracks always win, but when the queue is empty autoplay keeps the
+    // station alive: never idle-disconnect while it can still find something.
+    if (this._autoplay && seed && this.queue.isEmpty && this.autoplayCanContinue()) {
+      this.scheduleAutoplayRetry(seed);
+      return;
+    }
+
+    this.finishIdle();
+  }
+
+  private finishIdle(): void {
     this._state = "IDLE";
     this.notifyQueueChange();
     this.scheduleIdleDisconnect();
   }
 
+  private autoplayCanContinue(): boolean {
+    return env.autoplayMaxConsecutive <= 0 || this.autoplayCount < env.autoplayMaxConsecutive;
+  }
+
+  /** Low-frequency retry loop: keeps the bot connected when autoplay finds nothing. */
+  private scheduleAutoplayRetry(seed: Track): void {
+    if (this.destroyed || this.autoplayRetryTimer) return;
+    if (!this.connection || this.connection.state.status !== VoiceConnectionStatus.Ready) {
+      this.finishIdle();
+      return;
+    }
+
+    this._state = "IDLE";
+    this.notifyQueueChange();
+    logger.info(
+      { guild: this.guildId, seed: seed.title, retryMs: env.autoplayRetryMs },
+      "Autoplay found nothing yet, retrying later",
+    );
+
+    this.autoplayRetryTimer = setTimeout(() => {
+      this.autoplayRetryTimer = undefined;
+      void this.runExclusive(async () => {
+        if (this.destroyed) return;
+        if (!this.connection || this.connection.state.status !== VoiceConnectionStatus.Ready) {
+          this.finishIdle();
+          return;
+        }
+
+        const related = await this.resolveAutoplay(seed);
+        if (related) {
+          try {
+            await this.startTrack(related);
+            return;
+          } catch (error) {
+            logger.warn(
+              { err: error, guild: this.guildId, track: related.title },
+              "Autoplay retry track failed to start",
+            );
+            this._currentTrack = undefined;
+          }
+        }
+
+        if (this.autoplayCanContinue()) this.scheduleAutoplayRetry(seed);
+        else this.finishIdle();
+      });
+    }, env.autoplayRetryMs);
+  }
+
+  private clearAutoplayRetry(): void {
+    if (this.autoplayRetryTimer) clearTimeout(this.autoplayRetryTimer);
+    this.autoplayRetryTimer = undefined;
+  }
+
   private async resolveAutoplay(seed: Track): Promise<Track | undefined> {
     if (!this.onAutoplay) return undefined;
-    if (this.autoplayCount >= env.autoplayMaxConsecutive) {
+    if (!this.autoplayCanContinue()) {
       logger.info(
-        { guild: this.guildId, count: this.autoplayCount },
+        { guild: this.guildId, count: this.autoplayCount, cap: env.autoplayMaxConsecutive },
         "Autoplay limit reached, stopping",
       );
       return undefined;
@@ -627,7 +723,8 @@ export class GuildPlayer {
   private rememberTrack(track: Track): void {
     this.recentTrackIds.delete(track.id);
     this.recentTrackIds.add(track.id);
-    if (this.recentTrackIds.size > 25) {
+    const limit = Math.max(1, env.autoplayHistory);
+    if (this.recentTrackIds.size > limit) {
       const oldest = this.recentTrackIds.values().next().value;
       if (oldest !== undefined) this.recentTrackIds.delete(oldest);
     }
@@ -772,6 +869,7 @@ export class GuildPlayer {
     this.destroyed = true;
     this.clearIdleTimer();
     this.clearEmptyChannelTimer();
+    this.clearAutoplayRetry();
     this.queue.clear();
     this._currentTrack = undefined;
     this._lastTextChannelId = undefined;
