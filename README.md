@@ -48,7 +48,8 @@
 | `/playnext query:<texte ou URL>` | Insère un morceau juste après le morceau courant |
 | `/playlist url:<URL> [limit:<n>]` | Importe une playlist YouTube dans la file |
 | `/pause` · `/resume` | Met en pause / reprend la lecture |
-| `/skip` | Passe au morceau suivant |
+| `/skip` | Passe au morceau suivant (vote pour les non-modérateurs) |
+| `/forceskip` | Force le passage au morceau suivant (permission « Gérer le serveur ») |
 | `/previous` | Rejoue le morceau précédent |
 | `/voteskip` | Vote pour passer au morceau suivant |
 | `/stop` | Arrête la lecture et vide la file |

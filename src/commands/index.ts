@@ -1,6 +1,7 @@
 import { autoplay } from "./autoplay";
 import { clear } from "./clear";
 import { filter } from "./filter";
+import { forceskip } from "./forceskip";
 import { help } from "./help";
 import { leave } from "./leave";
 import { loop } from "./loop";
@@ -34,6 +35,7 @@ export const commands: CommandDefinition[] = [
   pause,
   resume,
   skip,
+  forceskip,
   previous,
   seek,
   stop,

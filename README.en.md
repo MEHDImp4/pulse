@@ -48,7 +48,8 @@
 | `/playnext query:<text or URL>` | Insert a track right after the current one |
 | `/playlist url:<URL> [limit:<n>]` | Import a YouTube playlist into the queue |
 | `/pause` · `/resume` | Pause / resume playback |
-| `/skip` | Skip to the next track |
+| `/skip` | Skip to the next track (votes for non-moderators) |
+| `/forceskip` | Force skip to the next track ("Manage Server" permission) |
 | `/previous` | Replay the previous track |
 | `/voteskip` | Vote to skip the current track |
 | `/stop` | Stop playback and clear the queue |
