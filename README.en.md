@@ -207,6 +207,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 | No sound | Check *Connect* + *Speak* permissions and opus libs |
 | `yt-dlp` fails on some videos | Provide `YTDLP_COOKIES_FILE` (restricted/anti-bot videos) |
 | Commands missing in Discord | Run `npm run deploy:commands` then `Ctrl+R` in Discord |
+| Duplicate commands or "This command is outdated" | Mixed global/guild scope: run `npm run deploy:commands` (it clears the other scope) then `Ctrl+R` |
 
 ## 🤝 Contributing
 

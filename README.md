@@ -203,6 +203,7 @@ Couvre la logique pure : opérations de file, `decideNext` (boucle), cooldowns, 
 | Aucun son | Vérifie les permissions *Connect* + *Speak* et les libs opus |
 | `yt-dlp` échoue sur certaines vidéos | Fournis `YTDLP_COOKIES_FILE` (vidéos restreintes/anti-bot) |
 | Commandes absentes de Discord | `npm run deploy:commands` puis `Ctrl+R` dans Discord |
+| Commandes en double ou « This command is outdated » | Mélange de portées globale/guild : `npm run deploy:commands` (le script vide l'autre portée) puis `Ctrl+R` |
 
 ## 🤝 Contribuer
 
