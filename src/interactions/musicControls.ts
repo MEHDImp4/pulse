@@ -5,10 +5,12 @@ import {
   type VoiceBasedChannel,
 } from "discord.js";
 import { env } from "../config/env";
+import type { GuildPlayer } from "../music/GuildPlayer";
 import type { PlayerManager } from "../music/PlayerManager";
 import { computeSkipThreshold } from "../music/voteSkip";
 import { refreshNowPlaying } from "../services/nowPlaying";
 import { parseMusicControl } from "../ui/controls";
+import { canUseDjControls, DJ_ONLY_MESSAGE } from "../utils/permissions";
 import { formatDuration } from "../utils/time";
 
 async function replyPrivate(interaction: ButtonInteraction, content: string): Promise<void> {
@@ -26,6 +28,34 @@ function botVoiceChannel(interaction: ButtonInteraction, channelId: string): Voi
   if (!interaction.guild) return null;
   const channel = interaction.guild.channels.cache.get(channelId);
   return channel?.isVoiceBased() ? channel : null;
+}
+
+/** Casts a skip vote: used by the vote button and by non-DJ members pressing "Suivant". */
+async function castSkipVote(
+  interaction: ButtonInteraction,
+  player: GuildPlayer,
+  channelId: string,
+): Promise<void> {
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  let voiceChannel = botVoiceChannel(interaction, channelId);
+  if (!voiceChannel) {
+    const fetched = await guild.channels.fetch(channelId).catch(() => null);
+    if (fetched?.isVoiceBased()) voiceChannel = fetched;
+  }
+  if (!voiceChannel) {
+    await replyPrivate(interaction, "❌ Salon vocal introuvable pour compter les votes.");
+    return;
+  }
+
+  const humans = voiceChannel.members.filter((member) => !member.user.bot).size;
+  const threshold = computeSkipThreshold(humans, env.voteSkipMin, env.voteSkipRatio);
+  const result = await player.voteSkip(interaction.user.id, threshold);
+  await replyPrivate(
+    interaction,
+    result.skipped ? "⏭ Assez de votes — morceau ignoré." : `🗳️ Vote enregistré (${result.votes}/${threshold}).`,
+  );
 }
 
 export async function handleMusicControl(
@@ -59,6 +89,7 @@ export async function handleMusicControl(
     return true;
   }
 
+  const isDj = canUseDjControls(interaction.memberPermissions);
   const { action } = parsed;
 
   switch (action) {
@@ -77,35 +108,27 @@ export async function handleMusicControl(
     }
 
     case "skip": {
+      if (!isDj) {
+        await castSkipVote(interaction, player, parsed.channelId);
+        return true;
+      }
       const skipped = await player.skip();
       await replyPrivate(interaction, skipped ? "⏭ Morceau ignoré." : "ℹ️ Aucun morceau à ignorer.");
       return true;
     }
 
     case "stop":
+      if (!isDj) {
+        await replyPrivate(interaction, DJ_ONLY_MESSAGE);
+        return true;
+      }
       await player.stop();
       await replyPrivate(interaction, "⏹ Lecture arrêtée et file d'attente vidée.");
       return true;
 
-    case "voteskip": {
-      let voiceChannel = botVoiceChannel(interaction, parsed.channelId);
-      if (!voiceChannel) {
-        const fetched = await interaction.guild.channels.fetch(parsed.channelId).catch(() => null);
-        if (fetched?.isVoiceBased()) voiceChannel = fetched;
-      }
-      if (!voiceChannel) {
-        await replyPrivate(interaction, "❌ Salon vocal introuvable pour compter les votes.");
-        return true;
-      }
-      const humans = voiceChannel.members.filter((m) => !m.user.bot).size;
-      const threshold = computeSkipThreshold(humans, env.voteSkipMin, env.voteSkipRatio);
-      const result = await player.voteSkip(interaction.user.id, threshold);
-      await replyPrivate(
-        interaction,
-        result.skipped ? "⏭ Assez de votes — morceau ignoré." : `🗳️ Vote enregistré (${result.votes}/${threshold}).`,
-      );
+    case "voteskip":
+      await castSkipVote(interaction, player, parsed.channelId);
       return true;
-    }
 
     case "voldown":
     case "volup": {
@@ -118,6 +141,10 @@ export async function handleMusicControl(
 
     case "seekback":
     case "seekforward": {
+      if (!isDj) {
+        await replyPrivate(interaction, DJ_ONLY_MESSAGE);
+        return true;
+      }
       const elapsed = Math.floor((player.playbackElapsedMs ?? 0) / 1000);
       const delta = action === "seekforward" ? env.seekStepSeconds : -env.seekStepSeconds;
       const target = Math.max(0, elapsed + delta);

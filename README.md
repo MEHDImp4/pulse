@@ -34,6 +34,7 @@
 - ⏯️ **Contrôles par boutons** : pause, reprise, suivant, stop, vote-skip, volume ±
 - 📊 **Progression en direct** dans `/nowplaying` (barre + temps écoulé/total)
 - 🗳️ **Vote-skip** majoritaire (min. 2 voix) pour les écoutes en groupe
+- 🛡️ **Contrôles DJ** : Suivant / Arrêter / Seek / Clear / Remove / Shuffle / Loop réservés à la permission « Gérer le serveur » ; les autres membres peuvent **voter** pour passer
 - 🔊 **Volume réglable** en direct (0–100), affiché dans la fiche de lecture
 - 🚀 **Fiabilité** : retry automatique des flux, **SponsorBlock**, cookies `yt-dlp`, mise à jour `yt-dlp` au démarrage
 - 🛡️ **Anti-spam** : cooldowns par utilisateur et par commande

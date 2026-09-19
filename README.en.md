@@ -34,6 +34,7 @@
 - ⏯️ **Button controls**: pause, resume, skip, stop, vote-skip, volume
 - 📊 **Live progress** in `/nowplaying` (bar + elapsed/total time)
 - 🗳️ **Vote-skip** by majority (min. 2 votes) for group listening
+- 🛡️ **DJ controls**: skip / stop / seek / clear / remove / shuffle / loop require the "Manage Server" permission; other members can **vote** to skip
 - 🔊 **Live volume** control (0–100), shown on the now-playing card
 - 🚀 **Reliability**: automatic stream retry, **SponsorBlock**, `yt-dlp` cookies, `yt-dlp` self-update on start
 - 🛡️ **Anti-spam**: per-user, per-command cooldowns

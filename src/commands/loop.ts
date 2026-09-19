@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import { LOOP_MODES } from "../music/GuildSettingsStore";
 import type { LoopMode } from "../music/GuildPlayer";
+import { canUseDjControls, DJ_ONLY_MESSAGE } from "../utils/permissions";
 import { replyTemporary } from "../utils/reply";
 import { requireControlChannel } from "./helpers";
 import type { CommandDefinition } from "./types";
@@ -34,6 +35,11 @@ export const loop: CommandDefinition = {
     const mode = interaction.options.getString("mode");
     if (!mode) {
       await replyTemporary(interaction, `🔁 Répétition actuelle : **${LABELS[context.player.loopMode]}**`);
+      return;
+    }
+
+    if (!canUseDjControls(interaction.memberPermissions)) {
+      await replyTemporary(interaction, DJ_ONLY_MESSAGE);
       return;
     }
 

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import { refreshNowPlaying } from "../services/nowPlaying";
+import { canUseDjControls, DJ_ONLY_MESSAGE } from "../utils/permissions";
 import { replyTemporary } from "../utils/reply";
 import { formatDuration, parseTimecode } from "../utils/time";
 import { requireControlChannel } from "./helpers";
@@ -20,6 +21,11 @@ export const seek: CommandDefinition = {
   async execute(interaction, { players }) {
     const context = await requireControlChannel(interaction, players);
     if (!context) return;
+
+    if (!canUseDjControls(interaction.memberPermissions)) {
+      await replyTemporary(interaction, DJ_ONLY_MESSAGE);
+      return;
+    }
 
     if (!context.player.currentTrack) {
       await replyTemporary(interaction, "ℹ️ Aucun morceau en cours.");
