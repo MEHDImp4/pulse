@@ -45,4 +45,13 @@ describe("GuildPlayer", () => {
     player.lastTextChannelId = undefined;
     expect(player.lastTextChannelId).toBeUndefined();
   });
+
+  it("resets the now-playing idle flag when a card is (re)assigned", () => {
+    const player = new GuildPlayer("guild-1", "channel-1", new StubProvider(), () => {});
+    player.nowPlayingIdle = true;
+    expect(player.nowPlayingIdle).toBe(true);
+
+    player.setNowPlayingMessage(undefined);
+    expect(player.nowPlayingIdle).toBe(false);
+  });
 });
