@@ -34,10 +34,22 @@ describe("music control custom ids", () => {
       "custom_id" in component.data ? component.data.custom_id : undefined,
     );
 
-    expect(ids).toHaveLength(4);
+    expect(ids).toHaveLength(5);
     for (const id of ids) {
       expect(parseMusicControl(id!)?.channelId).toBe("987654321");
     }
+  });
+
+  it("renders a single pause/resume toggle driven by the paused state", () => {
+    const ids = (isPaused: boolean) =>
+      musicControlsRow("42", isPaused).components.map((component) =>
+        "custom_id" in component.data ? component.data.custom_id : undefined,
+      );
+
+    expect(ids(false)).toContain("mc:42:pause");
+    expect(ids(false)).not.toContain("mc:42:resume");
+    expect(ids(true)).toContain("mc:42:resume");
+    expect(ids(true)).not.toContain("mc:42:pause");
   });
 });
 
