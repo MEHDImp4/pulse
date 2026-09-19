@@ -56,7 +56,13 @@ describe("QueueStore", () => {
   it("persists and reloads sessions", () => {
     const file = tempFile();
     const store = new QueueStore(file, 0);
-    store.set("g1:c1", { guildId: "g1", channelId: "c1", current: track("a"), tracks: [track("b")] });
+    store.set("g1:c1", {
+      guildId: "g1",
+      channelId: "c1",
+      textChannelId: "t1",
+      current: track("a"),
+      tracks: [track("b")],
+    });
     store.flush();
 
     const reloaded = new QueueStore(file, 0);
@@ -64,6 +70,13 @@ describe("QueueStore", () => {
     const entry = reloaded.get("g1:c1");
     expect(entry?.current?.id).toBe("a");
     expect(entry?.tracks.map((item) => item.id)).toEqual(["b"]);
+    expect(entry?.textChannelId).toBe("t1");
+  });
+
+  it("exposes a snapshot of its entries", () => {
+    const store = new QueueStore(tempFile(), 0);
+    store.set("g1:c1", { guildId: "g1", channelId: "c1", tracks: [track("a")] });
+    expect(store.entries().map(([sessionId]) => sessionId)).toEqual(["g1:c1"]);
   });
 
   it("deletes removed sessions", () => {

@@ -33,10 +33,10 @@ describe("sanitizeSettings", () => {
 
 describe("mergeSettings", () => {
   it("updates only the provided field", () => {
-    expect(mergeSettings({ volume: 20, loopMode: "off", autoplay: false, filter: "off" }, { loopMode: "queue" })).toEqual({
+    expect(mergeSettings({ volume: 20, loopMode: "off", autoplay: true, filter: "off" }, { loopMode: "queue" })).toEqual({
       volume: 20,
       loopMode: "queue",
-      autoplay: false,
+      autoplay: true,
       filter: "off",
     });
   });
@@ -69,7 +69,7 @@ describe("GuildSettingsStore", () => {
 
     const reloaded = new GuildSettingsStore(file, 0);
     reloaded.load();
-    expect(reloaded.get("g1:chan", "g1")).toEqual({ volume: 35, loopMode: "queue", autoplay: false, filter: "off" });
+    expect(reloaded.get("g1:chan", "g1")).toEqual({ volume: 35, loopMode: "queue", autoplay: true, filter: "off" });
   });
 
   it("keeps different sessions of the same guild independent", () => {
@@ -92,7 +92,7 @@ describe("GuildSettingsStore", () => {
 
     const store = new GuildSettingsStore(file, 0);
     store.load();
-    expect(store.get("g1:brand-new", "g1")).toEqual({ volume: 20, loopMode: "track", autoplay: false, filter: "off" });
+    expect(store.get("g1:brand-new", "g1")).toEqual({ volume: 20, loopMode: "track", autoplay: true, filter: "off" });
   });
 
   it("migrates the legacy v1 flat format into guild defaults", () => {
@@ -101,7 +101,7 @@ describe("GuildSettingsStore", () => {
 
     const store = new GuildSettingsStore(file, 0);
     store.load();
-    expect(store.get("g1:any-chan", "g1")).toEqual({ volume: 30, loopMode: "queue", autoplay: false, filter: "off" });
+    expect(store.get("g1:any-chan", "g1")).toEqual({ volume: 30, loopMode: "queue", autoplay: true, filter: "off" });
   });
 
   it("persists the autoplay toggle", () => {
