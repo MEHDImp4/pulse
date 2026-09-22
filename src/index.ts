@@ -8,7 +8,7 @@ import { env } from "./config/env";
 import { PlayerManager } from "./music/PlayerManager";
 import { createProviderRegistry } from "./providers";
 import { YouTubeSuggestions } from "./services/suggestions";
-import { startNowPlayingUpdater } from "./services/nowPlaying";
+import { refreshNowPlaying, startNowPlayingUpdater } from "./services/nowPlaying";
 import { createShutdown } from "./shutdown";
 import { clearCooldowns, checkCooldown } from "./utils/cooldown";
 import { verifyExternalTools } from "./utils/externalTools";
@@ -109,6 +109,21 @@ async function handleAutocomplete(interaction: import("discord.js").Autocomplete
 
 client.on(Events.VoiceStateUpdate, (oldState, newState) => {
   const guild = newState.guild ?? oldState.guild;
+
+  // Discord lets users drag the bot between channels; the voice connection
+  // survives the move, so re-key the session and refresh the card (its buttons
+  // embed the channel id) instead of leaving a stale session behind.
+  const botId = client.user?.id;
+  if (
+    botId &&
+    newState.id === botId &&
+    oldState.channelId &&
+    newState.channelId &&
+    oldState.channelId !== newState.channelId
+  ) {
+    const moved = players.rebind(guild.id, oldState.channelId, newState.channelId);
+    if (moved) void refreshNowPlaying(moved);
+  }
 
   for (const player of players.getForGuild(guild.id)) {
     const channel = guild.channels.cache.get(player.channelId);

@@ -91,6 +91,17 @@ describe("QueueStore", () => {
     expect(reloaded.get("g1:c1")).toBeUndefined();
   });
 
+  it("moves a persisted session to a new channel id", () => {
+    const store = new QueueStore(tempFile(), 0);
+    store.set("g1:c1", { guildId: "g1", channelId: "c1", tracks: [track("a")] });
+
+    store.move("g1:c1", "g1:c2", "c2");
+
+    expect(store.get("g1:c1")).toBeUndefined();
+    expect(store.get("g1:c2")?.channelId).toBe("c2");
+    expect(store.entries().map(([sessionId]) => sessionId)).toEqual(["g1:c2"]);
+  });
+
   it("starts fresh when the file is missing", () => {
     const store = new QueueStore(tempFile(), 0);
     store.load();

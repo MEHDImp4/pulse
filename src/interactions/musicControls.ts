@@ -1,7 +1,7 @@
 import {
+  GuildMember,
   MessageFlags,
   type ButtonInteraction,
-  type GuildMember,
   type VoiceBasedChannel,
 } from "discord.js";
 import { env } from "../config/env";
@@ -76,7 +76,12 @@ export async function handleMusicControl(
     return true;
   }
 
-  const member = (await interaction.guild.members.fetch(interaction.user.id)) as GuildMember;
+  // Use the cached member from the interaction payload; a REST fetch here can
+  // exceed Discord's 3s ACK window and surface "Unknown interaction".
+  const member =
+    interaction.member instanceof GuildMember
+      ? interaction.member
+      : await interaction.guild.members.fetch(interaction.user.id);
   const channel = member.voice.channel;
 
   if (!channel) {

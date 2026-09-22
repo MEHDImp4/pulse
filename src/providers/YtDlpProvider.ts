@@ -4,6 +4,7 @@ import { env } from "../config/env";
 import type { RequestedBy, Track, TrackProvider } from "../music/Track";
 import { logger } from "../utils/logger";
 import { runProcess } from "../utils/process";
+import { createTtlCache } from "../utils/ttlCache";
 import type { AudioProvider, AudioSource, PlaylistResult } from "./AudioProvider";
 
 export interface YtDlpInfo {
@@ -33,6 +34,14 @@ export abstract class YtDlpProvider implements AudioProvider {
   abstract readonly name: TrackProvider;
   protected abstract readonly searchPrefix: string;
   protected abstract isAllowedUrl(url: string): boolean;
+
+  // Stable metadata (title/duration/thumbnail/canonical URL) is safe to cache
+  // for a short TTL, so repeated searches or link resolutions do not respawn
+  // yt-dlp. Stream URLs are never cached: they are resolved just-in-time.
+  private readonly infoCache = createTtlCache<string, YtDlpInfo>({
+    ttlMs: env.metadataCacheTtlMs,
+    maxEntries: env.metadataCacheMaxEntries,
+  });
 
   /** Fallback URL built from an id when yt-dlp returns none (YouTube only). */
   protected urlFromId(_id: string): string | undefined {
@@ -161,6 +170,12 @@ export abstract class YtDlpProvider implements AudioProvider {
   }
 
   protected async fetchInfo(target: string): Promise<YtDlpInfo> {
+    const cached = this.infoCache.get(target);
+    if (cached) {
+      logger.debug({ provider: this.name, target, cached: true }, "yt-dlp metadata cache hit");
+      return cached;
+    }
+
     const { stdout } = await runProcess(
       env.ytdlpPath,
       [...this.metadataArgs(), "--dump-json", "--skip-download", "--", target],
@@ -170,7 +185,9 @@ export abstract class YtDlpProvider implements AudioProvider {
     try {
       const line = stdout.split(/\r?\n/).map((item) => item.trim()).find(Boolean);
       if (!line) throw new Error("Réponse de métadonnées yt-dlp vide.");
-      return JSON.parse(line) as YtDlpInfo;
+      const info = JSON.parse(line) as YtDlpInfo;
+      this.infoCache.set(target, info);
+      return info;
     } catch {
       throw new Error("Impossible d'analyser les métadonnées yt-dlp.");
     }

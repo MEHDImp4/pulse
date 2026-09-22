@@ -60,6 +60,33 @@ export class PlayerManager {
     return [...this.players.values()].find((player) => player.channelId === channelId);
   }
 
+  /**
+   * Rebinds a session after Discord moves the bot to another voice channel.
+   * Keeps the live connection and playback, re-keys the registry and migrates
+   * the session-scoped settings and persisted queue. Returns the rebinding
+   * player, or undefined when no session exists in the source channel.
+   */
+  rebind(guildId: string, fromChannelId: string, toChannelId: string): GuildPlayer | undefined {
+    if (fromChannelId === toChannelId) return this.get(guildId, toChannelId);
+
+    const fromId = toSessionId(guildId, fromChannelId);
+    const toId = toSessionId(guildId, toChannelId);
+    const player = this.players.get(fromId);
+    if (!player) return this.get(guildId, toChannelId);
+
+    this.players.delete(fromId);
+    player.bindChannel(toChannelId);
+    this.players.set(toId, player);
+    this.settings.moveSession(fromId, toId);
+    this.queueStore?.move(fromId, toId, toChannelId);
+
+    logger.info(
+      { guild: guildId, from: fromChannelId, to: toChannelId },
+      "Rebound session to new voice channel",
+    );
+    return player;
+  }
+
   getOrCreate(guildId: string, channelId: string): GuildPlayer {
     const sessionId = toSessionId(guildId, channelId);
     const existing = this.players.get(sessionId);

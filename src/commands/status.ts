@@ -1,5 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { FILTER_LABELS } from "../audio/filters";
+import { getExternalToolStatus } from "../utils/externalTools";
 import { formatDuration } from "../utils/time";
 import type { CommandDefinition } from "./types";
 
@@ -25,6 +26,12 @@ export const status: CommandDefinition = {
   async execute(interaction, { players }) {
     const active = players.activePlayers();
     const memory = process.memoryUsage();
+    const tools = getExternalToolStatus();
+    const toolsValue =
+      tools.length === 0
+        ? "— (sonde au démarrage)"
+        : tools.map((tool) => `${tool.name} ${tool.ok ? "✅" : "❌"}`).join(" · ");
+    const liveProcesses = active.reduce((sum, player) => sum + player.childProcessCount, 0);
 
     const embed = new EmbedBuilder()
       .setTitle("📊 État de Pulse")
@@ -35,6 +42,8 @@ export const status: CommandDefinition = {
         { name: "Mémoire", value: `${formatBytes(memory.rss)} RSS`, inline: true },
         { name: "Node", value: process.version, inline: true },
         { name: "Gateway", value: formatPing(interaction.client.ws.ping), inline: true },
+        { name: "Outils", value: toolsValue, inline: true },
+        { name: "Processus", value: String(liveProcesses), inline: true },
       );
 
     if (active.length === 0) {

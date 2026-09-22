@@ -30,7 +30,7 @@ Do **not** paste your Discord token, cookies, or `.env` contents in an issue, PR
 Dependencies are reviewed weekly via Dependabot and `npm audit`.
 
 - **`tar` via `@discordjs/opus` → `@discordjs/node-pre-gyp`**: `node-pre-gyp` still pins `tar@^6`, so a package-level `overrides` entry forces the patched `tar@^7.5.22`. The chain is only used at install time to extract prebuilt native binaries, not at runtime. Re-check the override on any `@discordjs/opus` bump.
-- **`@discordjs/voice`** is intentionally pinned to a `1.0.0-dev` snapshot (Dependabot ignores it). Re-evaluate on every manual bump, as pre-release builds can change without notice.
+- **`@discordjs/voice`** is intentionally pinned to a `1.0.0-dev` snapshot (Dependabot ignores it). The `1.0.0` line carries the current Discord voice protocol support (DAVE/encryption); the latest stable `0.19.2` predates it, so downgrading is expected to break voice. Re-evaluate on every manual bump, as pre-release builds can change without notice. To evaluate a newer snapshot (e.g. `1.0.0-dev.1790035407-dbb749062`): work on a throwaway branch, run `npm install`, `npm run typecheck` and `npm test`, then verify live audio on a real guild with `/testaudio` + a full `/play`; revert unless audio is confirmed. Automated checks cannot validate live voice.
 
 ### Scope
 
@@ -69,7 +69,7 @@ Nous visons une réponse sous quelques jours. Le crédit sera donné, sauf si tu
 Les dépendances sont surveillées chaque semaine par Dependabot et `npm audit`.
 
 - **`tar` via `@discordjs/opus` → `@discordjs/node-pre-gyp`** : `node-pre-gyp` épingle encore `tar@^6`, donc une entrée `overrides` force le `tar@^7.5.22` corrigé. Cette chaîne ne sert qu'à l'installation (extraction des binaires natifs préconstruits), jamais à l'exécution. À revérifier à chaque montée de `@discordjs/opus`.
-- **`@discordjs/voice`** est volontairement épinglé à un snapshot `1.0.0-dev` (ignoré par Dependabot). À réévaluer à chaque montée de version manuelle, un build pré-release pouvant changer sans préavis.
+- **`@discordjs/voice`** est volontairement épinglé à un snapshot `1.0.0-dev` (ignoré par Dependabot). La branche `1.0.0` embarque le support du protocole vocal actuel de Discord (DAVE/chiffrement) ; le dernier stable `0.19.2` est antérieur, donc rétrograder casserait la voix. À réévaluer à chaque montée manuelle, un build pré-release pouvant changer sans préavis. Pour évaluer un snapshot plus récent (ex. `1.0.0-dev.1790035407-dbb749062`) : travaille sur une branche jetable, lance `npm install`, `npm run typecheck` et `npm test`, puis vérifie l'audio réel sur un vrai serveur avec `/testaudio` + un `/play` complet ; reviens en arrière si l'audio n'est pas confirmé. Les vérifications automatiques ne peuvent pas valider la voix en conditions réelles.
 
 ### Périmètre
 

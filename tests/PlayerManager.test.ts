@@ -65,6 +65,31 @@ describe("PlayerManager", () => {
     expect(manager.getForChannel("chan-x")).toBeUndefined();
   });
 
+  it("rebinds a session when the bot is moved to another channel", () => {
+    const manager = new PlayerManager(new StubProvider());
+    const player = manager.getOrCreate("guild-a", "chan-1");
+
+    const rebound = manager.rebind("guild-a", "chan-1", "chan-2");
+
+    expect(rebound).toBe(player);
+    expect(player.channelId).toBe("chan-2");
+    expect(manager.get("guild-a", "chan-1")).toBeUndefined();
+    expect(manager.get("guild-a", "chan-2")).toBe(player);
+    expect(manager.size).toBe(1);
+  });
+
+  it("returns the session already bound to the target channel on rebind", () => {
+    const manager = new PlayerManager(new StubProvider());
+    const player = manager.getOrCreate("guild-a", "chan-2");
+
+    expect(manager.rebind("guild-a", "chan-1", "chan-2")).toBe(player);
+  });
+
+  it("rebind is a no-op when the source session is unknown", () => {
+    const manager = new PlayerManager(new StubProvider());
+    expect(manager.rebind("guild-a", "missing", "chan-2")).toBeUndefined();
+  });
+
   it("resolves text searches through the provider", async () => {
     const manager = new PlayerManager(new StubProvider());
     const result = await manager.resolveTrack("hello", { id: "1", username: "Tester" });

@@ -14,9 +14,11 @@ import {
 import type { Message, VoiceBasedChannel } from "discord.js";
 import { AudioPipeline } from "../audio/AudioPipeline";
 import type { FilterPreset } from "../audio/filters";
+import { waitForStatus } from "../audio/playbackWatchdog";
 import { percentToGain } from "../audio/volume";
 import { env } from "../config/env";
 import type { AudioProvider } from "../providers/AudioProvider";
+import { terminateAll } from "../utils/childProcess";
 import { logger } from "../utils/logger";
 import { DEFAULT_GUILD_SETTINGS, type GuildSettings } from "./GuildSettingsStore";
 import type { PlayerState } from "./PlayerState";
@@ -75,6 +77,7 @@ export class GuildPlayer {
   private bypassLoop = false;
   private _currentTrack?: Track;
   private _state: PlayerState = "IDLE";
+  private _channelId: string;
   private _lastTextChannelId?: string;
   private _volume = 100;
   private _loopMode: LoopMode = "off";
@@ -91,7 +94,7 @@ export class GuildPlayer {
 
   constructor(
     readonly guildId: string,
-    readonly channelId: string,
+    channelId: string,
     provider: AudioProvider,
     private readonly onDestroyed: (sessionId: string) => void,
     private readonly onNotify?: NotifyFn,
@@ -100,6 +103,7 @@ export class GuildPlayer {
     private readonly onQueueChange?: (player: GuildPlayer) => void,
     private readonly onAutoplay?: (seed: Track, exclude: ReadonlySet<string>) => Promise<Track | undefined>,
   ) {
+    this._channelId = channelId;
     this.pipeline = new AudioPipeline(provider);
     this._volume = initialSettings.volume;
     this._loopMode = initialSettings.loopMode;
@@ -162,6 +166,19 @@ export class GuildPlayer {
 
   get state(): PlayerState {
     return this._state;
+  }
+
+  get channelId(): string {
+    return this._channelId;
+  }
+
+  /**
+   * Rebinds this session to another voice channel after Discord moves the bot.
+   * The live VoiceConnection follows the move on its own, so only the session
+   * key needs updating; the owner migrates the map/settings/queue keys.
+   */
+  bindChannel(channelId: string): void {
+    this._channelId = channelId;
   }
 
   get sessionId(): string {
@@ -619,6 +636,10 @@ export class GuildPlayer {
         return;
       } catch (error) {
         logger.warn({ err: error, guild: this.guildId, track: next.title }, "Skipping unreadable track");
+        // The command layer already reports a failed first track; auto-advance
+        // failures have no caller, so surface them here (never for autoplay, to
+        // avoid spamming the channel while the radio hunts for a playable one).
+        if (!usedAutoplay) this.notifyTrackFailure(next, error);
         this._currentTrack = undefined;
         previous = undefined;
         // Do not hammer the related-track lookup when autoplay keeps failing.
@@ -761,6 +782,9 @@ export class GuildPlayer {
         this.childProcesses = processes;
         this.currentResource = resource;
         this.audioPlayer.play(resource);
+        // Guard against a stalled yt-dlp/FFmpeg pipe: without a watchdog the
+        // player would sit in BUFFERING forever and block the serial queue.
+        await this.waitForPlaybackStart();
         logger.info(
           {
             guild: this.guildId,
@@ -783,16 +807,23 @@ export class GuildPlayer {
 
     this._currentTrack = undefined;
     this._state = "ERROR";
-    this.notifyTrackError(track, attempts, lastError);
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 
-  private notifyTrackError(track: Track, attempts: number, error: unknown): void {
+  /**
+   * Resolves once the player really starts reading audio. Rejects when the
+   * player errors first or the stream never becomes readable within
+   * `STREAM_START_TIMEOUT_MS`, signalling a dead pipe to the retry loop.
+   */
+  private waitForPlaybackStart(): Promise<void> {
+    return waitForStatus(this.audioPlayer, AudioPlayerStatus.Playing, env.streamStartTimeoutMs);
+  }
+
+  private notifyTrackFailure(track: Track, error: unknown): void {
     if (!this.onNotify || !this._lastTextChannelId) return;
     const reason = error instanceof Error ? error.message : "erreur inconnue";
-    const suffix = attempts > 1 ? ` après ${attempts} tentatives` : "";
     try {
-      this.onNotify(this._lastTextChannelId, `❌ Impossible de lire **${track.title}**${suffix} : ${reason}`);
+      this.onNotify(this._lastTextChannelId, `❌ Impossible de lire **${track.title}** : ${reason}`);
     } catch (notifyError) {
       logger.warn({ err: notifyError, guild: this.guildId }, "Failed to send error notification");
     }
@@ -821,45 +852,10 @@ export class GuildPlayer {
     this.childProcesses = [];
     if (processes.length === 0) return;
 
-    const hasExited = (proc: ChildProcess): boolean =>
-      proc.exitCode !== null || proc.signalCode !== null;
-
-    // Resolve as soon as a process really exits (not merely when kill() was called).
-    const exits = processes.map(
-      (proc) =>
-        new Promise<void>((resolve) => {
-          if (hasExited(proc)) {
-            resolve();
-            return;
-          }
-          proc.once("exit", () => resolve());
-          proc.once("close", () => resolve());
-          proc.once("error", () => resolve());
-        }),
-    );
-
-    // Phase 1: ask every live process to terminate.
-    for (const proc of processes) {
-      if (!hasExited(proc)) proc.kill("SIGTERM");
-    }
-
-    // Phase 2: wait up to 1 second for a graceful exit, then force-kill.
-    const SIGTERM_GRACE_MS = 1_000;
-    const exitedInTime = await Promise.race([
-      Promise.all(exits).then(() => true),
-      new Promise<false>((resolve) => {
-        setTimeout(() => resolve(false), SIGTERM_GRACE_MS).unref();
-      }),
-    ]);
-
-    if (!exitedInTime) {
-      for (const proc of processes) {
-        if (!hasExited(proc)) {
-          proc.kill("SIGKILL");
-          logger.warn({ pid: proc.pid }, "Force-killed process with SIGKILL after timeout");
-        }
-      }
-    }
+    await terminateAll(processes, {
+      onForceKill: (process) =>
+        logger.warn({ pid: process.pid }, "Force-killed process with SIGKILL after timeout"),
+    });
 
     logger.debug({ count: processes.length }, "All child processes terminated");
   }

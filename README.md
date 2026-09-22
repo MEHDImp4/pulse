@@ -27,7 +27,7 @@
 - ♾️ **Radio (autoplay)** : activé par défaut, enchaîne des titres similaires quand la file se vide ; les titres ajoutés par les membres restent prioritaires (`/autoplay` pour couper)
 - 🎛️ **Filtres audio** : bassboost, nightcore, vaporwave, 8D, treble, normalisation (`/filter`)
 - 🎤 **Paroles synchronisées** via lrclib (`/lyrics`)
-- 📊 **Observabilité** : `/status` (uptime, sessions actives, latence voix, mémoire)
+- 📊 **Observabilité** : `/status` (uptime, sessions actives, latence voix, mémoire, état `yt-dlp`/FFmpeg, processus enfants)
 - ⏩ **Seek** et **morceau précédent** : navigation dans le morceau (`/seek`, `/previous`, boutons ⏪/⏩)
 - 💾 **Persistance & reprise** : files par salon, et le bot rejoint et reprend sa session après un redémarrage
 - 🔁 **Boucle** morceau / file, 🔀 **shuffle**, ⏭ **insertion en tête** (`/playnext`)
@@ -66,7 +66,7 @@
 | `/volume level:<0-100>` | Règle le volume (affiche le volume si omis) |
 | `/leave` | Déconnecte le bot du salon vocal |
 | `/testaudio` | Joue un bip local de 3 s pour tester la voix |
-| `/status` | État du bot : uptime, serveurs, sessions, latences, mémoire |
+| `/status` | État du bot : uptime, serveurs, sessions, latences, mémoire, outils, processus |
 | `/help` | Liste les commandes |
 
 ## ✅ Prérequis
@@ -109,6 +109,7 @@ Toutes les variables sont optionnelles sauf mention contraire.
 | `MAX_QUEUE_SIZE` | `100` | Taille max de la file par serveur |
 | `MAX_TRACK_DURATION_MINUTES` | `180` | Durée max d'un morceau (0 = illimité) |
 | `MAX_STREAM_RETRIES` | `2` | Tentatives de lecture avant d'abandonner un morceau |
+| `STREAM_START_TIMEOUT_MS` | `20000` | Délai max avant de considérer qu'un flux n'a pas démarré (puis retry) |
 | `IDLE_TIMEOUT_SECONDS` | `300` | Déconnexion auto après inactivité |
 | `EMPTY_CHANNEL_TIMEOUT_SECONDS` | `60` | Déconnexion auto quand le salon est vide |
 | `COMMAND_COOLDOWN_SECONDS` | `5` | Cooldown anti-spam par défaut |
@@ -138,6 +139,8 @@ Toutes les variables sont optionnelles sauf mention contraire.
 | `LYRICS_API_BASE` | `https://lrclib.net` | Base de l'API de paroles |
 | `LYRICS_TIMEOUT_MS` | `8000` | Timeout des requêtes de paroles |
 | `YTDLP_PATH` / `FFMPEG_PATH` | `yt-dlp` / `ffmpeg` | Chemins des binaires |
+| `METADATA_CACHE_TTL_MS` | `600000` | Durée de vie du cache de métadonnées `yt-dlp` (0 = désactivé) |
+| `METADATA_CACHE_MAX_ENTRIES` | `500` | Nombre max d'entrées du cache de métadonnées |
 | `DATA_DIR` | `data` (`/data` en Docker) | Dossier de persistance (réglages et files par salon) |
 
 ## 🐳 Docker
@@ -208,7 +211,9 @@ Couvre la logique pure : opérations de file, `decideNext` (boucle), cooldowns, 
 | Symptôme | Piste |
 |---|---|
 | « An invalid token was provided » | Vérifie `DISCORD_TOKEN` dans `.env.docker` / `.env` |
-| Aucun son | Vérifie les permissions *Connect* + *Speak* et les libs opus |
+| `yt-dlp not found` / `FFmpeg not found` | Installe le binaire ou renseigne `YTDLP_PATH` / `FFMPEG_PATH` ; l'état est affiché par `/status` |
+| Le bot rejoint mais aucun son | Vérifie les permissions *Connect* + *Speak* et les libs opus ; teste avec `/testaudio` |
+| Échec de connexion vocale | Vérifie les permissions du salon et `VOICE_CONNECTION_TIMEOUT_MS`, puis relance la commande |
 | `yt-dlp` échoue sur certaines vidéos | Fournis `YTDLP_COOKIES_FILE` (vidéos restreintes/anti-bot) |
 | Commandes absentes de Discord | `npm run deploy:commands` puis `Ctrl+R` dans Discord |
 | Commandes en double ou « This command is outdated » | Mélange de portées globale/guild : `npm run deploy:commands` (le script vide l'autre portée) puis `Ctrl+R` |

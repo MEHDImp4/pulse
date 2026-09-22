@@ -18,6 +18,13 @@ export type ToolRunner = (
   options: { timeoutMs: number; maxOutputBytes?: number },
 ) => Promise<{ stdout: string; stderr: string }>;
 
+let lastResults: readonly ExternalToolResult[] = [];
+
+/** Last startup probe results, for cheap diagnostics (e.g. /status). */
+export function getExternalToolStatus(): readonly ExternalToolResult[] {
+  return lastResults;
+}
+
 function firstLine(text: string): string | undefined {
   return text
     .split(/\r?\n/)
@@ -55,6 +62,7 @@ export async function verifyExternalTools(runner: ToolRunner = runProcess): Prom
     checkExternalTool(runner, "ffmpeg", env.ffmpegPath, ["-version"]),
     checkExternalTool(runner, "yt-dlp", env.ytdlpPath, ["--version"]),
   ]);
+  lastResults = results;
 
   for (const result of results) {
     if (result.ok) {

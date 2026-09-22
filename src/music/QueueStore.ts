@@ -117,6 +117,15 @@ export class QueueStore {
     if (this.sessions.delete(sessionId)) this.scheduleSave();
   }
 
+  /** Moves a persisted session to a new id (used when the bot is moved). */
+  move(from: string, to: string, channelId: string): void {
+    const entry = this.sessions.get(from);
+    if (!entry) return;
+    this.sessions.delete(from);
+    this.sessions.set(to, { ...entry, channelId, savedAt: Date.now() });
+    this.scheduleSave();
+  }
+
   private scheduleSave(): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {

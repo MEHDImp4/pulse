@@ -127,6 +127,15 @@ export class GuildSettingsStore {
     return next;
   }
 
+  /** Moves a session's overrides to a new id (used when the bot is moved). */
+  moveSession(from: string, to: string): void {
+    const existing = this.sessions.get(from);
+    if (!existing) return;
+    this.sessions.delete(from);
+    this.sessions.set(to, existing);
+    this.scheduleSave();
+  }
+
   private scheduleSave(): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {

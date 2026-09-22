@@ -1,8 +1,8 @@
 import {
+  GuildMember,
   MessageFlags,
   PermissionFlagsBits,
   type ChatInputCommandInteraction,
-  type GuildMember,
   type VoiceBasedChannel,
 } from "discord.js";
 import type { GuildPlayer } from "../music/GuildPlayer";
@@ -12,8 +12,15 @@ export async function memberVoiceChannel(
   interaction: ChatInputCommandInteraction,
 ): Promise<VoiceBasedChannel | null> {
   if (!interaction.guild) return null;
-  const member = (await interaction.guild.members.fetch(interaction.user.id)) as GuildMember;
-  return member.voice.channel;
+  // `interaction.member` comes from the interaction payload and is served from
+  // cache: no REST round-trip, so commands stay well inside Discord's 3s ACK
+  // window (a cold `members.fetch` used to expire the interaction). Only fall
+  // back to an API fetch when the member is not a cached GuildMember instance.
+  const member = interaction.member;
+  if (member instanceof GuildMember) return member.voice.channel;
+
+  const fetched = await interaction.guild.members.fetch(interaction.user.id);
+  return fetched.voice.channel;
 }
 
 export interface ControlContext {
@@ -50,27 +57,45 @@ export async function requireControlChannel(
   return { player, channel };
 }
 
+export type PlaybackPrep =
+  | { status: "ok"; channel: VoiceBasedChannel }
+  | { status: "error"; message: string };
+
 /**
- * Refuses to open a second voice session in a guild where the bot is already
- * connected elsewhere: Discord allows only one voice channel per guild per bot,
- * so a second join would silently hijack the existing connection. Replies
- * itself (ephemeral) on conflict and returns false.
+ * Validates that a playback command may open a voice session: the caller must
+ * be in a voice channel the bot can join, and no session may already be active
+ * in another channel of the same guild (Discord allows one voice channel per
+ * guild per bot, so a second join would hijack the existing connection).
+ *
+ * Never replies: callers run this after deferring and render the single
+ * response themselves, which keeps every path free of interaction races.
  */
-export async function ensureNoOtherGuildSession(
+export async function preparePlayback(
   interaction: ChatInputCommandInteraction,
   players: PlayerManager,
-  channelId: string,
-): Promise<boolean> {
-  if (!interaction.guildId) return true;
+): Promise<PlaybackPrep> {
+  if (!interaction.guildId || !interaction.guild) {
+    return { status: "error", message: "❌ Cette commande doit être utilisée dans un serveur." };
+  }
 
-  const conflict = players.findGuildConflict(interaction.guildId, channelId);
-  if (!conflict) return true;
+  const channel = await memberVoiceChannel(interaction);
+  if (!channel) {
+    return { status: "error", message: "❌ Tu dois être dans un salon vocal pour utiliser cette commande." };
+  }
 
-  await interaction.reply({
-    content: `❌ Je suis déjà connecté dans <#${conflict.channelId}> sur ce serveur. Utilise \`/leave\` là-bas avant de lancer une autre session.`,
-    flags: MessageFlags.Ephemeral,
-  });
-  return false;
+  if (!canJoinAndSpeak(channel, interaction)) {
+    return { status: "error", message: "❌ Je n'ai pas la permission de rejoindre ou parler dans ce salon." };
+  }
+
+  const conflict = players.findGuildConflict(interaction.guildId, channel.id);
+  if (conflict) {
+    return {
+      status: "error",
+      message: `❌ Je suis déjà connecté dans <#${conflict.channelId}> sur ce serveur. Utilise \`/leave\` là-bas avant de lancer une autre session.`,
+    };
+  }
+
+  return { status: "ok", channel };
 }
 
 export type ReadPlayerResult =

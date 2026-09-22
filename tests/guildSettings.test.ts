@@ -115,6 +115,22 @@ describe("GuildSettingsStore", () => {
     expect(reloaded.get("g1:chan", "g1").autoplay).toBe(true);
   });
 
+  it("moves session overrides to a new id", () => {
+    const store = new GuildSettingsStore(tempFile(), 0);
+    store.update("g1:chanA", "g1", { volume: 15 });
+
+    store.moveSession("g1:chanA", "g1:chanB");
+
+    expect(store.get("g1:chanA", "g1")).toEqual(DEFAULT_GUILD_SETTINGS);
+    expect(store.get("g1:chanB", "g1").volume).toBe(15);
+  });
+
+  it("ignores moveSession for an unknown source", () => {
+    const store = new GuildSettingsStore(tempFile(), 0);
+    expect(() => store.moveSession("g1:none", "g1:other")).not.toThrow();
+    expect(store.get("g1:other", "g1")).toEqual(DEFAULT_GUILD_SETTINGS);
+  });
+
   it("recovers from a corrupt file using defaults", () => {
     const file = tempFile();
     writeFileSync(file, "{ not valid json", "utf8");

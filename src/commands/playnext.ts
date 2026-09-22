@@ -1,7 +1,7 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { playbackControlsRows } from "../ui/controls";
 import { nowPlayingEmbed, queuedEmbed } from "../ui/embeds";
-import { canJoinAndSpeak, ensureNoOtherGuildSession, memberVoiceChannel } from "./helpers";
+import { preparePlayback } from "./helpers";
 import type { CommandDefinition } from "./types";
 
 export const playnext: CommandDefinition = {
@@ -23,20 +23,16 @@ export const playnext: CommandDefinition = {
       return;
     }
 
-    const channel = await memberVoiceChannel(interaction);
-    if (!channel) {
-      await interaction.reply({ content: "❌ Tu dois être dans un salon vocal pour utiliser cette commande.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-
-    if (!canJoinAndSpeak(channel, interaction)) {
-      await interaction.reply({ content: "❌ Je n'ai pas la permission de rejoindre ou parler dans ce salon.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-
-    if (!(await ensureNoOtherGuildSession(interaction, players, channel.id))) return;
-
+    // Acknowledge before any work so a slow lookup can never expire the token.
     await interaction.deferReply();
+
+    const prep = await preparePlayback(interaction, players);
+    if (prep.status === "error") {
+      await interaction.editReply(prep.message);
+      return;
+    }
+    const channel = prep.channel;
+
     const query = interaction.options.getString("query", true);
 
     try {

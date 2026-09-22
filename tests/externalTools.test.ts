@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { checkExternalTool, verifyExternalTools, type ToolRunner } from "../src/utils/externalTools";
+import {
+  checkExternalTool,
+  getExternalToolStatus,
+  verifyExternalTools,
+  type ToolRunner,
+} from "../src/utils/externalTools";
 
 describe("checkExternalTool", () => {
   it("reports success and the first version line", async () => {
@@ -32,5 +37,15 @@ describe("verifyExternalTools", () => {
     expect(probed).toEqual(["ffmpeg", "yt-dlp"]);
     expect(results.map((result) => result.name)).toEqual(["ffmpeg", "yt-dlp"]);
     expect(results.every((result) => result.ok)).toBe(true);
+  });
+
+  it("caches the last probe results for cheap diagnostics", async () => {
+    const runner: ToolRunner = async (executable) => ({ stdout: `${executable} 1.0\n`, stderr: "" });
+
+    await verifyExternalTools(runner);
+
+    const status = getExternalToolStatus();
+    expect(status.map((result) => result.name)).toEqual(["ffmpeg", "yt-dlp"]);
+    expect(status.every((result) => result.ok)).toBe(true);
   });
 });

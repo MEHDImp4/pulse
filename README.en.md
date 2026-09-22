@@ -27,7 +27,7 @@
 - ♾️ **Radio (autoplay)**: on by default, chains related tracks when the queue empties; member-queued tracks stay first (`/autoplay` to disable)
 - 🎛️ **Audio filters**: bassboost, nightcore, vaporwave, 8D, treble, loudness normalization (`/filter`)
 - 🎤 **Synced lyrics** via lrclib (`/lyrics`)
-- 📊 **Observability**: `/status` (uptime, active sessions, voice latency, memory)
+- 📊 **Observability**: `/status` (uptime, active sessions, voice latency, memory, `yt-dlp`/FFmpeg status, child processes)
 - ⏩ **Seek** and **previous track**: navigate within a track (`/seek`, `/previous`, ⏪/⏩ buttons)
 - 💾 **Persistence & resume**: per-channel queues, and the bot rejoins and resumes its session after a restart
 - 🔁 **Loop** track / queue, 🔀 **shuffle**, ⏭ **play next** (`/playnext`)
@@ -66,7 +66,7 @@
 | `/volume level:<0-100>` | Set the volume (shows current volume if omitted) |
 | `/leave` | Disconnect the bot from the voice channel |
 | `/testaudio` | Play a local 3 s tone to test voice |
-| `/status` | Bot status: uptime, guilds, sessions, latency, memory |
+| `/status` | Bot status: uptime, guilds, sessions, latency, memory, tools, processes |
 | `/help` | List commands |
 
 ## ✅ Requirements
@@ -111,6 +111,7 @@ All variables are optional unless stated otherwise.
 | `MAX_QUEUE_SIZE` | `100` | Max queue size per server |
 | `MAX_TRACK_DURATION_MINUTES` | `180` | Max track duration (0 = unlimited) |
 | `MAX_STREAM_RETRIES` | `2` | Playback attempts before giving up on a track |
+| `STREAM_START_TIMEOUT_MS` | `20000` | Max delay before a stream is considered stalled (then retried) |
 | `IDLE_TIMEOUT_SECONDS` | `300` | Auto-disconnect after inactivity |
 | `EMPTY_CHANNEL_TIMEOUT_SECONDS` | `60` | Auto-disconnect when the channel is empty |
 | `COMMAND_COOLDOWN_SECONDS` | `5` | Default anti-spam cooldown |
@@ -140,6 +141,8 @@ All variables are optional unless stated otherwise.
 | `LYRICS_API_BASE` | `https://lrclib.net` | Lyrics API base URL |
 | `LYRICS_TIMEOUT_MS` | `8000` | Lyrics request timeout |
 | `YTDLP_PATH` / `FFMPEG_PATH` | `yt-dlp` / `ffmpeg` | Binary paths |
+| `METADATA_CACHE_TTL_MS` | `600000` | `yt-dlp` metadata cache lifetime (0 = disabled) |
+| `METADATA_CACHE_MAX_ENTRIES` | `500` | Max metadata cache entries |
 | `DATA_DIR` | `data` (`/data` in Docker) | Persistence directory for settings and queues |
 
 ## 🐳 Docker
@@ -212,7 +215,9 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 | Symptom | Hint |
 |---|---|
 | "An invalid token was provided" | Check `DISCORD_TOKEN` in `.env.docker` / `.env` |
-| No sound | Check *Connect* + *Speak* permissions and opus libs |
+| `yt-dlp not found` / `FFmpeg not found` | Install the binary or set `YTDLP_PATH` / `FFMPEG_PATH`; status is shown in `/status` |
+| Bot joins but no sound | Check *Connect* + *Speak* permissions and opus libs; test with `/testaudio` |
+| Voice connection failure | Check channel permissions and `VOICE_CONNECTION_TIMEOUT_MS`, then retry the command |
 | `yt-dlp` fails on some videos | Provide `YTDLP_COOKIES_FILE` (restricted/anti-bot videos) |
 | Commands missing in Discord | Run `npm run deploy:commands` then `Ctrl+R` in Discord |
 | Duplicate commands or "This command is outdated" | Mixed global/guild scope: run `npm run deploy:commands` (it clears the other scope) then `Ctrl+R` |

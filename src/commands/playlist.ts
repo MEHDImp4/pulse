@@ -1,6 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { env } from "../config/env";
-import { canJoinAndSpeak, ensureNoOtherGuildSession, memberVoiceChannel } from "./helpers";
+import { preparePlayback } from "./helpers";
 import { importPlaylist } from "./playlistImport";
 import type { CommandDefinition } from "./types";
 
@@ -30,23 +30,19 @@ export const playlist: CommandDefinition = {
       return;
     }
 
-    const channel = await memberVoiceChannel(interaction);
-    if (!channel) {
-      await interaction.reply({ content: "❌ Tu dois être dans un salon vocal pour utiliser cette commande.", flags: MessageFlags.Ephemeral });
+    // Acknowledge before any work so a slow lookup can never expire the token.
+    await interaction.deferReply();
+
+    const prep = await preparePlayback(interaction, players);
+    if (prep.status === "error") {
+      await interaction.editReply(prep.message);
       return;
     }
-
-    if (!canJoinAndSpeak(channel, interaction)) {
-      await interaction.reply({ content: "❌ Je n'ai pas la permission de rejoindre ou parler dans ce salon.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-
-    if (!(await ensureNoOtherGuildSession(interaction, players, channel.id))) return;
+    const channel = prep.channel;
 
     const url = interaction.options.getString("url", true);
     const limit = interaction.options.getInteger("limit") ?? env.playlistMaxItems;
 
-    await interaction.deferReply();
     await importPlaylist(interaction, players, channel, url, limit);
   },
 };
