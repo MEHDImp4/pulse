@@ -1,6 +1,7 @@
 import { env } from "../config/env";
 import { fetchJson } from "../utils/http";
 import { asString } from "../utils/strings";
+import { createTtlCache } from "../utils/ttlCache";
 import { parseLrc, type LrcLine } from "./lrc";
 
 export interface LyricsQuery {
@@ -51,14 +52,42 @@ function toResult(value: unknown): LyricsResult | undefined {
   };
 }
 
+const CACHE_TTL_MS = 30 * 60_000;
+const CACHE_MAX_ENTRIES = 500;
+
+/** Normalized cache key for a lyrics query. Pure and exported for testing. */
+export function lyricsCacheKey(query: LyricsQuery): string {
+  return [
+    query.title.trim().toLowerCase(),
+    (query.artist ?? "").trim().toLowerCase(),
+    query.durationSeconds ?? "",
+  ].join("|");
+}
+
 /** Fetches lyrics from lrclib.net (exact match first, then search). */
 export class LyricsService {
+  private readonly cache = createTtlCache<string, LyricsResult | null>({
+    ttlMs: CACHE_TTL_MS,
+    maxEntries: CACHE_MAX_ENTRIES,
+  });
+
   constructor(
     private readonly baseUrl = env.lyricsApiBase,
     private readonly timeoutMs = env.lyricsTimeoutMs,
   ) {}
 
   async lookup(query: LyricsQuery): Promise<LyricsResult | undefined> {
+    const key = lyricsCacheKey(query);
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached ?? undefined;
+
+    const result = await this.lookupUncached(query);
+    // Cache misses (null) too, so a track without lyrics is not re-queried.
+    this.cache.set(key, result ?? null);
+    return result;
+  }
+
+  private async lookupUncached(query: LyricsQuery): Promise<LyricsResult | undefined> {
     const exact = await this.getExact(query);
     if (exact) return exact;
 

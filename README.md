@@ -110,11 +110,15 @@ Toutes les variables sont optionnelles sauf mention contraire.
 | `MAX_TRACK_DURATION_MINUTES` | `180` | Durée max d'un morceau (0 = illimité) |
 | `MAX_STREAM_RETRIES` | `2` | Tentatives de lecture avant d'abandonner un morceau |
 | `STREAM_START_TIMEOUT_MS` | `20000` | Délai max avant de considérer qu'un flux n'a pas démarré (puis retry) |
+| `STALL_CHECK_INTERVAL_SECONDS` | `10` | Intervalle de détection d'un flux gelé (0 = désactivé) |
+| `STALL_TIMEOUT_SECONDS` | `30` | Durée sans progression avant de considérer le flux gelé |
+| `MAX_STALL_RECOVERIES` | `2` | Redémarrages d'un flux gelé avant de passer au morceau suivant |
 | `IDLE_TIMEOUT_SECONDS` | `300` | Déconnexion auto après inactivité |
 | `EMPTY_CHANNEL_TIMEOUT_SECONDS` | `60` | Déconnexion auto quand le salon est vide |
 | `COMMAND_COOLDOWN_SECONDS` | `5` | Cooldown anti-spam par défaut |
 | `AUTO_DELETE_SECONDS` | `1` | Suppression auto des messages de confirmation (0 = désactivé ; les messages à boutons sont conservés) |
-| `SPONSORBLOCK_CATEGORIES` | `sponsor,selfpromo` | Passages ignorés par SponsorBlock |
+| `SPONSORBLOCK_CATEGORIES` | `sponsor,selfpromo` | Passages ciblés par SponsorBlock |
+| `SPONSORBLOCK_MODE` | `remove` | `remove` (coupe, plus coûteux), `mark` (marque seulement) ou `off` |
 | `YTDLP_COOKIES_FILE` | — | Cookies `yt-dlp` (vidéos restreintes / anti-bot) |
 | `YTDLP_AUTO_UPDATE` | `true` | Met à jour `yt-dlp` au démarrage du conteneur |
 | `NOWPLAYING_LIVE` | `true` | Rafraîchit la barre de progression |
@@ -138,6 +142,8 @@ Toutes les variables sont optionnelles sauf mention contraire.
 | `LYRICS_ENABLED` | `true` | Active `/lyrics` |
 | `LYRICS_API_BASE` | `https://lrclib.net` | Base de l'API de paroles |
 | `LYRICS_TIMEOUT_MS` | `8000` | Timeout des requêtes de paroles |
+| `EXTERNAL_PROCESS_TIMEOUT_MS` | `20000` | Timeout des appels `yt-dlp` de métadonnées |
+| `VOICE_CONNECTION_TIMEOUT_MS` | `20000` | Timeout de connexion au salon vocal |
 | `YTDLP_PATH` / `FFMPEG_PATH` | `yt-dlp` / `ffmpeg` | Chemins des binaires |
 | `METADATA_CACHE_TTL_MS` | `600000` | Durée de vie du cache de métadonnées `yt-dlp` (0 = désactivé) |
 | `METADATA_CACHE_MAX_ENTRIES` | `500` | Nombre max d'entrées du cache de métadonnées |

@@ -15,6 +15,7 @@ import type { Message, VoiceBasedChannel } from "discord.js";
 import { AudioPipeline } from "../audio/AudioPipeline";
 import type { FilterPreset } from "../audio/filters";
 import { waitForStatus } from "../audio/playbackWatchdog";
+import { evaluateStall } from "../audio/stallWatchdog";
 import { percentToGain } from "../audio/volume";
 import { env } from "../config/env";
 import type { AudioProvider } from "../providers/AudioProvider";
@@ -87,6 +88,10 @@ export class GuildPlayer {
   private _seekOffsetMs = 0;
   private suppressNextIdle = false;
   private startingTrack = false;
+  private stallTimer?: NodeJS.Timeout;
+  private lastPlaybackDuration = 0;
+  private stalledChecks = 0;
+  private stallRecoveries = 0;
   private autoplayCount = 0;
   private readonly recentTrackIds = new Set<string>();
   private readonly history: Track[] = [];
@@ -165,6 +170,66 @@ export class GuildPlayer {
 
     this.audioPlayer.on("debug", (message) => {
       logger.debug({ guild: this.guildId, message }, "Audio player debug");
+    });
+
+    if (env.stallCheckIntervalSeconds > 0) {
+      this.stallTimer = setInterval(() => this.checkStall(), env.stallCheckIntervalSeconds * 1000);
+      this.stallTimer.unref();
+    }
+  }
+
+  /**
+   * Detects a stream that stopped advancing without emitting an error (frozen
+   * pipe) and recovers by restarting the track once, then skipping it.
+   */
+  private checkStall(): void {
+    if (this.destroyed) return;
+    const resource = this.currentResource;
+
+    if (this._state !== "PLAYING" || !resource) {
+      this.lastPlaybackDuration = resource?.playbackDuration ?? 0;
+      this.stalledChecks = 0;
+      return;
+    }
+
+    const currentDuration = resource.playbackDuration ?? 0;
+    const { stalledChecks, action } = evaluateStall({
+      previousDuration: this.lastPlaybackDuration,
+      currentDuration,
+      stalledChecks: this.stalledChecks,
+      checkIntervalMs: env.stallCheckIntervalSeconds * 1000,
+      stallTimeoutMs: env.stallTimeoutSeconds * 1000,
+      recoveries: this.stallRecoveries,
+      maxRecoveries: env.maxStallRecoveries,
+    });
+    this.lastPlaybackDuration = currentDuration;
+    this.stalledChecks = stalledChecks;
+
+    if (action === "none") return;
+
+    void this.runExclusive(async () => {
+      if (this.destroyed || this._state !== "PLAYING") return;
+      const track = this._currentTrack;
+      if (!track) return;
+
+      if (action === "skip" || this.stallRecoveries >= env.maxStallRecoveries) {
+        logger.warn(
+          { guild: this.guildId, track: track.title, recoveries: this.stallRecoveries },
+          "Playback stalled with no recovery left, skipping track",
+        );
+        this.bypassLoop = true;
+        await this.killProcesses();
+        this.audioPlayer.stop(true);
+        return;
+      }
+
+      this.stallRecoveries += 1;
+      const position = Math.floor((this.currentResource?.playbackDuration ?? 0) / 1000);
+      logger.warn(
+        { guild: this.guildId, track: track.title, position, recovery: this.stallRecoveries },
+        "Playback stalled, restarting track",
+      );
+      await this.reloadCurrent(track, position, true);
     });
   }
 
@@ -574,11 +639,11 @@ export class GuildPlayer {
     });
   }
 
-  private async reloadCurrent(track: Track, startSeconds: number): Promise<void> {
+  private async reloadCurrent(track: Track, startSeconds: number, isRecovery = false): Promise<void> {
     this.suppressNextIdle = true;
     await this.killProcesses();
     this.audioPlayer.stop(true);
-    await this.startTrack(track, startSeconds);
+    await this.startTrack(track, startSeconds, isRecovery);
   }
 
   async stop(): Promise<void> {
@@ -764,7 +829,7 @@ export class GuildPlayer {
     if (this.history.length > 25) this.history.shift();
   }
 
-  private async startTrack(track: Track, startSeconds = 0): Promise<void> {
+  private async startTrack(track: Track, startSeconds = 0, isRecovery = false): Promise<void> {
     if (!this.connection || this.connection.state.status !== VoiceConnectionStatus.Ready) {
       throw new Error("Voice connection is not ready");
     }
@@ -773,6 +838,10 @@ export class GuildPlayer {
     this._state = "BUFFERING";
     this._currentTrack = track;
     this._seekOffsetMs = Math.max(0, Math.floor(startSeconds)) * 1000;
+    // A stall recovery must keep counting toward the cap; a fresh track resets it.
+    if (!isRecovery) this.stallRecoveries = 0;
+    this.lastPlaybackDuration = 0;
+    this.stalledChecks = 0;
     this.rememberTrack(track);
     this.skipVotes.clear();
     await this.killProcesses();
@@ -881,6 +950,8 @@ export class GuildPlayer {
     this.clearIdleTimer();
     this.clearEmptyChannelTimer();
     this.clearAutoplayRetry();
+    if (this.stallTimer) clearInterval(this.stallTimer);
+    this.stallTimer = undefined;
     this.queue.clear();
     this._currentTrack = undefined;
     this._lastTextChannelId = undefined;

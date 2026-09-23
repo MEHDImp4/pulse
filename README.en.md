@@ -112,11 +112,15 @@ All variables are optional unless stated otherwise.
 | `MAX_TRACK_DURATION_MINUTES` | `180` | Max track duration (0 = unlimited) |
 | `MAX_STREAM_RETRIES` | `2` | Playback attempts before giving up on a track |
 | `STREAM_START_TIMEOUT_MS` | `20000` | Max delay before a stream is considered stalled (then retried) |
+| `STALL_CHECK_INTERVAL_SECONDS` | `10` | Frozen-stream detection interval (0 = disabled) |
+| `STALL_TIMEOUT_SECONDS` | `30` | No-progress duration before a stream is considered frozen |
+| `MAX_STALL_RECOVERIES` | `2` | Frozen-stream restarts before skipping the track |
 | `IDLE_TIMEOUT_SECONDS` | `300` | Auto-disconnect after inactivity |
 | `EMPTY_CHANNEL_TIMEOUT_SECONDS` | `60` | Auto-disconnect when the channel is empty |
 | `COMMAND_COOLDOWN_SECONDS` | `5` | Default anti-spam cooldown |
 | `AUTO_DELETE_SECONDS` | `1` | Auto-delete confirmation replies (0 = disabled; messages with buttons are kept) |
-| `SPONSORBLOCK_CATEGORIES` | `sponsor,selfpromo` | Segments skipped via SponsorBlock |
+| `SPONSORBLOCK_CATEGORIES` | `sponsor,selfpromo` | Segments targeted by SponsorBlock |
+| `SPONSORBLOCK_MODE` | `remove` | `remove` (cut, extra work), `mark` (mark only) or `off` |
 | `YTDLP_COOKIES_FILE` | — | `yt-dlp` cookies (restricted / anti-bot videos) |
 | `YTDLP_AUTO_UPDATE` | `true` | Update `yt-dlp` on container start |
 | `NOWPLAYING_LIVE` | `true` | Refresh the progress bar |
@@ -140,6 +144,8 @@ All variables are optional unless stated otherwise.
 | `LYRICS_ENABLED` | `true` | Enable `/lyrics` |
 | `LYRICS_API_BASE` | `https://lrclib.net` | Lyrics API base URL |
 | `LYRICS_TIMEOUT_MS` | `8000` | Lyrics request timeout |
+| `EXTERNAL_PROCESS_TIMEOUT_MS` | `20000` | Timeout for `yt-dlp` metadata calls |
+| `VOICE_CONNECTION_TIMEOUT_MS` | `20000` | Voice channel connection timeout |
 | `YTDLP_PATH` / `FFMPEG_PATH` | `yt-dlp` / `ffmpeg` | Binary paths |
 | `METADATA_CACHE_TTL_MS` | `600000` | `yt-dlp` metadata cache lifetime (0 = disabled) |
 | `METADATA_CACHE_MAX_ENTRIES` | `500` | Max metadata cache entries |

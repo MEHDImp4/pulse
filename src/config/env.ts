@@ -30,6 +30,15 @@ function required(name: string): string {
   return value;
 }
 
+export const SPONSORBLOCK_MODES = ["remove", "mark", "off"] as const;
+export type SponsorblockMode = (typeof SPONSORBLOCK_MODES)[number];
+
+function sponsorblockModeEnv(name: string, fallback: SponsorblockMode): SponsorblockMode {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) return fallback;
+  return (SPONSORBLOCK_MODES as readonly string[]).includes(raw) ? (raw as SponsorblockMode) : fallback;
+}
+
 export const env = {
   discordToken: required("DISCORD_TOKEN"),
   discordClientId: required("DISCORD_CLIENT_ID"),
@@ -41,11 +50,15 @@ export const env = {
   maxTrackDurationMinutes: intEnv("MAX_TRACK_DURATION_MINUTES", 180),
   maxStreamRetries: intEnv("MAX_STREAM_RETRIES", 2),
   streamStartTimeoutMs: intEnv("STREAM_START_TIMEOUT_MS", 20_000),
+  stallCheckIntervalSeconds: intEnv("STALL_CHECK_INTERVAL_SECONDS", 10),
+  stallTimeoutSeconds: intEnv("STALL_TIMEOUT_SECONDS", 30),
+  maxStallRecoveries: intEnv("MAX_STALL_RECOVERIES", 2),
   ytdlpPath: process.env.YTDLP_PATH?.trim() || "yt-dlp",
   ffmpegPath: process.env.FFMPEG_PATH?.trim() || "ffmpeg",
   dataDir: process.env.DATA_DIR?.trim() || "data",
   ytdlpCookiesFile: process.env.YTDLP_COOKIES_FILE?.trim() || undefined,
   sponsorblockCategories: process.env.SPONSORBLOCK_CATEGORIES?.trim() ?? "sponsor,selfpromo",
+  sponsorblockMode: sponsorblockModeEnv("SPONSORBLOCK_MODE", "remove"),
   externalProcessTimeoutMs: intEnv("EXTERNAL_PROCESS_TIMEOUT_MS", 20_000),
   metadataCacheTtlMs: intEnv("METADATA_CACHE_TTL_MS", 600_000),
   metadataCacheMaxEntries: intEnv("METADATA_CACHE_MAX_ENTRIES", 500),

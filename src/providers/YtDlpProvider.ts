@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { Readable } from "node:stream";
-import { env } from "../config/env";
+import { env, type SponsorblockMode } from "../config/env";
 import type { RequestedBy, Track, TrackProvider } from "../music/Track";
 import { logger } from "../utils/logger";
 import { runProcess } from "../utils/process";
@@ -24,6 +24,16 @@ export interface YtDlpInfo {
 export interface FlatPlaylist {
   title?: string;
   entries: YtDlpInfo[];
+}
+
+/**
+ * Builds the SponsorBlock yt-dlp flags for the configured mode. `remove` cuts
+ * the segments during streaming (extra FFmpeg work), `mark` only marks them.
+ * Pure and exported for testing.
+ */
+export function sponsorblockArgs(mode: SponsorblockMode, categories: string): string[] {
+  if (mode === "off" || !categories.trim()) return [];
+  return [mode === "mark" ? "--sponsorblock-mark" : "--sponsorblock-remove", categories];
 }
 
 /**
@@ -232,10 +242,9 @@ export abstract class YtDlpProvider implements AudioProvider {
   }
 
   protected streamArgs(): string[] {
-    const args = [...this.metadataArgs()];
-    if (env.sponsorblockCategories) {
-      args.push("--sponsorblock-remove", env.sponsorblockCategories);
-    }
-    return args;
+    return [
+      ...this.metadataArgs(),
+      ...sponsorblockArgs(env.sponsorblockMode, env.sponsorblockCategories),
+    ];
   }
 }
