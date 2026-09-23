@@ -7,6 +7,13 @@ services:
     restart: unless-stopped
     init: true
     stop_grace_period: 15s
+    # Bound child processes (yt-dlp/FFmpeg) and cap Docker json-file logs.
+    pids_limit: 512
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     env_file:
       - .env.docker
     environment:
