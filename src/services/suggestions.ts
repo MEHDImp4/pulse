@@ -1,5 +1,6 @@
 import { fetchJson } from "../utils/http";
 import { logger } from "../utils/logger";
+import { createTtlCache } from "../utils/ttlCache";
 
 export interface Suggestion {
   name: string;
@@ -35,7 +36,10 @@ const CACHE_TTL_MS = 5 * 60_000;
 const CACHE_MAX_ENTRIES = 200;
 
 export class YouTubeSuggestions implements SuggestionsProvider {
-  private readonly cache = new Map<string, { at: number; choices: Suggestion[] }>();
+  private readonly cache = createTtlCache<string, Suggestion[]>({
+    ttlMs: CACHE_TTL_MS,
+    maxEntries: CACHE_MAX_ENTRIES,
+  });
 
   constructor(private readonly timeoutMs = 800) {}
 
@@ -47,9 +51,7 @@ export class YouTubeSuggestions implements SuggestionsProvider {
     // TTL cache instead of hitting the network every time.
     const cacheKey = `${limit}:${trimmed.toLowerCase()}`;
     const cached = this.cache.get(cacheKey);
-    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
-      return cached.choices;
-    }
+    if (cached) return cached;
 
     const url = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(trimmed)}`;
 
@@ -60,19 +62,11 @@ export class YouTubeSuggestions implements SuggestionsProvider {
         headers: { "User-Agent": "Mozilla/5.0" },
       });
       const choices = parseSuggestions(payload, limit);
-      this.remember(cacheKey, choices);
+      this.cache.set(cacheKey, choices);
       return choices;
     } catch (error) {
       logger.debug({ err: error }, "Suggestion lookup failed");
       return [];
     }
-  }
-
-  private remember(key: string, choices: Suggestion[]): void {
-    this.cache.set(key, { at: Date.now(), choices });
-    if (this.cache.size <= CACHE_MAX_ENTRIES) return;
-
-    const oldest = this.cache.keys().next().value;
-    if (oldest !== undefined) this.cache.delete(oldest);
   }
 }

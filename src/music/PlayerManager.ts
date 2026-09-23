@@ -323,4 +323,9 @@ export class PlayerManager {
   activePlayers(): GuildPlayer[] {
     return [...this.players.values()].filter((player) => player.isConnected);
   }
+
+  /** Every known session, connected or not (for diagnostics/metrics). */
+  allPlayers(): GuildPlayer[] {
+    return [...this.players.values()];
+  }
 }

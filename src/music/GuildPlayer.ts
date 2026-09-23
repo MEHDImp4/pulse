@@ -20,6 +20,7 @@ import { env } from "../config/env";
 import type { AudioProvider } from "../providers/AudioProvider";
 import { terminateAll } from "../utils/childProcess";
 import { logger } from "../utils/logger";
+import { recordTrackFailed, recordTrackStarted } from "../utils/metrics";
 import { DEFAULT_GUILD_SETTINGS, type GuildSettings } from "./GuildSettingsStore";
 import type { PlayerState } from "./PlayerState";
 import { QueueManager } from "./QueueManager";
@@ -85,6 +86,7 @@ export class GuildPlayer {
   private _filter: FilterPreset = "off";
   private _seekOffsetMs = 0;
   private suppressNextIdle = false;
+  private startingTrack = false;
   private autoplayCount = 0;
   private readonly recentTrackIds = new Set<string>();
   private readonly history: Track[] = [];
@@ -152,6 +154,12 @@ export class GuildPlayer {
         "Audio player error",
       );
       this._state = "ERROR";
+      // While startTrack is retrying, its watchdog observes this error and will
+      // retry; swallow the Idle emitted by stop() so the queue is not advanced
+      // behind the retry. Only when truly idle, so the flag cannot linger.
+      if (this.startingTrack && this.audioPlayer.state.status !== AudioPlayerStatus.Idle) {
+        this.suppressNextIdle = true;
+      }
       this.audioPlayer.stop(true);
     });
 
@@ -321,7 +329,7 @@ export class GuildPlayer {
       });
 
       this.connection.on("stateChange", (oldState, newState) => {
-        logger.info(
+        logger.debug(
           {
             guild: this.guildId,
             from: oldState.status,
@@ -773,40 +781,47 @@ export class GuildPlayer {
     const attempts = Math.max(1, env.maxStreamRetries + 1);
     let lastError: unknown;
 
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      try {
-        const { processes, resource } = await this.pipeline.create(track, this._volume, {
-          filter: this._filter,
-          startSeconds,
-        });
-        this.childProcesses = processes;
-        this.currentResource = resource;
-        this.audioPlayer.play(resource);
-        // Guard against a stalled yt-dlp/FFmpeg pipe: without a watchdog the
-        // player would sit in BUFFERING forever and block the serial queue.
-        await this.waitForPlaybackStart();
-        logger.info(
-          {
-            guild: this.guildId,
-            track: track.title,
-            attempt,
-            playableConnections: this.audioPlayer.playable.length,
-          },
-          "Audio resource submitted to player",
-        );
-        return;
-      } catch (error) {
-        lastError = error;
-        logger.warn(
-          { err: error, guild: this.guildId, track: track.title, attempt, attempts },
-          "Track start attempt failed",
-        );
-        await this.killProcesses();
+    this.startingTrack = true;
+    try {
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          const { processes, resource } = await this.pipeline.create(track, this._volume, {
+            filter: this._filter,
+            startSeconds,
+          });
+          this.childProcesses = processes;
+          this.currentResource = resource;
+          this.audioPlayer.play(resource);
+          // Guard against a stalled yt-dlp/FFmpeg pipe: without a watchdog the
+          // player would sit in BUFFERING forever and block the serial queue.
+          await this.waitForPlaybackStart();
+          recordTrackStarted();
+          logger.info(
+            {
+              guild: this.guildId,
+              track: track.title,
+              attempt,
+              playableConnections: this.audioPlayer.playable.length,
+            },
+            "Audio resource submitted to player",
+          );
+          return;
+        } catch (error) {
+          lastError = error;
+          logger.warn(
+            { err: error, guild: this.guildId, track: track.title, attempt, attempts },
+            "Track start attempt failed",
+          );
+          await this.killProcesses();
+        }
       }
+    } finally {
+      this.startingTrack = false;
     }
 
     this._currentTrack = undefined;
     this._state = "ERROR";
+    recordTrackFailed();
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 
