@@ -2,6 +2,8 @@ import type { RequestedBy, Track, TrackProvider } from "../music/Track";
 import { fetchJson } from "../utils/http";
 import { asString } from "../utils/strings";
 import { MetadataProvider } from "./MetadataProvider";
+import { mapPlaylistSongs, playlistId } from "./playlistImport";
+import type { PlaylistResult } from "./AudioProvider";
 
 interface DeezerTrack {
   title?: string;
@@ -33,6 +35,24 @@ export class DeezerProvider extends MetadataProvider {
 
   supports(url: string): boolean {
     return isDeezerUrl(url);
+  }
+
+  async resolvePlaylist(url: string, requestedBy: RequestedBy, limit = 50): Promise<PlaylistResult> {
+    const id = playlistId(url, "deezer");
+    if (!id) throw new Error("Lien de playlist Deezer invalide.");
+    const payload = await fetchJson(`https://api.deezer.com/playlist/${id}/tracks?limit=${Math.min(100, limit)}&index=0`) as {
+      data?: Array<{ title?: string; artist?: { name?: string } }>;
+      error?: { message?: string };
+    };
+    if (payload.error) throw new Error(payload.error.message ?? "Playlist Deezer inaccessible.");
+    const songs = (payload.data ?? []).flatMap((item) => {
+      const title = asString(item.title);
+      return title ? [{ title, artist: asString(item.artist?.name) }] : [];
+    });
+    return {
+      title: "Playlist Deezer",
+      tracks: await mapPlaylistSongs(songs, requestedBy, this.searcher, limit),
+    };
   }
 
   async resolve(url: string, requestedBy: RequestedBy): Promise<Track> {

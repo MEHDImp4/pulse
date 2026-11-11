@@ -3,6 +3,8 @@ import { fetchJson } from "../utils/http";
 import { logger } from "../utils/logger";
 import { asNumber, asString } from "../utils/strings";
 import { MetadataProvider } from "./MetadataProvider";
+import { mapPlaylistSongs, playlistId } from "./playlistImport";
+import type { PlaylistResult } from "./AudioProvider";
 
 interface SpotifyTokenResponse {
   access_token?: string;
@@ -38,11 +40,14 @@ export class SpotifyProvider extends MetadataProvider {
   readonly name = "spotify" as TrackProvider;
   private token?: { value: string; expiresAt: number };
   private tokenPromise?: Promise<string>;
+  private userToken?: { value: string; expiresAt: number };
+  private userTokenPromise?: Promise<string>;
 
   constructor(
     searcher: MetadataProvider["searcher"],
     private readonly clientId: string,
     private readonly clientSecret: string,
+    private readonly refreshToken?: string,
   ) {
     super(searcher);
   }
@@ -70,6 +75,54 @@ export class SpotifyProvider extends MetadataProvider {
           .join(" ")
       : "";
     return this.searchOnYouTube(artists ? `${artists} ${title}` : title, requestedBy);
+  }
+
+  async resolvePlaylist(url: string, requestedBy: RequestedBy, limit = 50): Promise<PlaylistResult> {
+    const id = playlistId(url, "spotify");
+    if (!id) throw new Error("Lien de playlist Spotify invalide.");
+    if (!this.refreshToken) {
+      throw new Error("Spotify exige un OAuth utilisateur pour les playlists. Configure SPOTIFY_REFRESH_TOKEN avec un compte propriétaire/collaborateur.");
+    }
+    const token = await this.getUserToken();
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      const payload = await fetchJson(
+        `https://api.spotify.com/v1/playlists/${id}/items?limit=${Math.min(50, limit)}&offset=0`,
+        { headers },
+      ) as { items?: Array<{ item?: SpotifyTrack; track?: SpotifyTrack }> };
+      const songs = (payload.items ?? []).map((item) => item.item ?? item.track).flatMap((track) => {
+        const title = asString(track?.name);
+        if (!title) return [];
+        const artist = track?.artists?.map((a) => asString(a.name)).filter(Boolean).join(" ");
+        return [{ title, artist }];
+      });
+      const tracks = await mapPlaylistSongs(songs, requestedBy, this.searcher, limit);
+      return { title: "Playlist Spotify", tracks };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("403")) {
+        throw new Error("Spotify autorise uniquement les playlists dont ce compte est propriétaire ou collaborateur.");
+      }
+      throw error;
+    }
+  }
+
+  private async getUserToken(): Promise<string> {
+    if (!this.refreshToken) throw new Error("SPOTIFY_REFRESH_TOKEN manquant");
+    if (this.userToken && this.userToken.expiresAt > Date.now() + 30_000) return this.userToken.value;
+    this.userTokenPromise ??= (async () => {
+      const basic = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64");
+      const payload = await fetchJson("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: this.refreshToken! }).toString(),
+      }) as SpotifyTokenResponse;
+      const value = asString(payload.access_token);
+      if (!value) throw new Error("Échec du renouvellement OAuth Spotify.");
+      this.userToken = { value, expiresAt: Date.now() + (payload.expires_in ?? 3600) * 1000 };
+      return value;
+    })().finally(() => { this.userTokenPromise = undefined; });
+    return this.userTokenPromise;
   }
 
   private async getToken(): Promise<string> {

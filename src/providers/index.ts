@@ -19,11 +19,11 @@ export function createProviderRegistry(): AudioProvider {
     youtube,
     new SoundCloudProvider(),
     new DeezerProvider(youtube),
-    new AppleMusicProvider(youtube),
+    new AppleMusicProvider(youtube, env.appleMusicDeveloperToken, env.appleMusicStorefront),
   ];
 
   if (env.spotifyClientId && env.spotifyClientSecret) {
-    providers.push(new SpotifyProvider(youtube, env.spotifyClientId, env.spotifyClientSecret));
+    providers.push(new SpotifyProvider(youtube, env.spotifyClientId, env.spotifyClientSecret, env.spotifyRefreshToken));
   }
 
   return new ProviderRegistry({
