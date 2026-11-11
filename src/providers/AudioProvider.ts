@@ -34,6 +34,7 @@ export interface AudioProvider {
   /** Whether this provider can handle the given URL. */
   supports(url: string): boolean;
   search(query: string, requestedBy: RequestedBy): Promise<Track>;
+  searchChoices?(query: string, requestedBy: RequestedBy, limit: number): Promise<Track[]>;
   resolve(url: string, requestedBy: RequestedBy): Promise<Track>;
   createSource(track: Track): Promise<AudioSource>;
   /** Resolves a playlist URL into individual tracks (optional capability). */

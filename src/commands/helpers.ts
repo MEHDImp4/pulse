@@ -3,13 +3,14 @@ import {
   MessageFlags,
   PermissionFlagsBits,
   type ChatInputCommandInteraction,
+  type StringSelectMenuInteraction,
   type VoiceBasedChannel,
 } from "discord.js";
 import type { GuildPlayer } from "../music/GuildPlayer";
 import type { PlayerManager } from "../music/PlayerManager";
 
 export async function memberVoiceChannel(
-  interaction: ChatInputCommandInteraction,
+  interaction: ChatInputCommandInteraction | StringSelectMenuInteraction,
 ): Promise<VoiceBasedChannel | null> {
   if (!interaction.guild) return null;
   // `interaction.member` comes from the interaction payload and is served from
@@ -71,7 +72,7 @@ export type PlaybackPrep =
  * response themselves, which keeps every path free of interaction races.
  */
 export async function preparePlayback(
-  interaction: ChatInputCommandInteraction,
+  interaction: ChatInputCommandInteraction | StringSelectMenuInteraction,
   players: PlayerManager,
 ): Promise<PlaybackPrep> {
   if (!interaction.guildId || !interaction.guild) {
@@ -141,7 +142,7 @@ export async function resolveReadPlayer(
   return { status: "none" };
 }
 
-export function canJoinAndSpeak(channel: VoiceBasedChannel, interaction: ChatInputCommandInteraction): boolean {
+export function canJoinAndSpeak(channel: VoiceBasedChannel, interaction: ChatInputCommandInteraction | StringSelectMenuInteraction): boolean {
   const permissions = channel.permissionsFor(interaction.guild!.members.me!);
   return Boolean(
     permissions?.has(PermissionFlagsBits.Connect) && permissions.has(PermissionFlagsBits.Speak),

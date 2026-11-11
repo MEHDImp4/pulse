@@ -89,6 +89,14 @@ export abstract class YtDlpProvider implements AudioProvider {
     return this.toTrack(info, requestedBy);
   }
 
+  async searchChoices(query: string, requestedBy: RequestedBy, limit = 5): Promise<Track[]> {
+    const normalized = query.trim();
+    if (!normalized) throw new Error("La recherche est vide.");
+    const count = Math.max(1, Math.min(10, Math.floor(limit)));
+    const result = await this.fetchEntries(`${this.searchPrefix}${count}:${normalized}`, count);
+    return this.toTracks(result.entries, requestedBy).slice(0, count);
+  }
+
   async resolve(url: string, requestedBy: RequestedBy): Promise<Track> {
     if (!this.isAllowedUrl(url)) {
       throw new Error(`URL non supportée par ${this.name}.`);
