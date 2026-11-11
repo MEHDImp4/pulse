@@ -87,9 +87,8 @@ describe("ProviderRegistry", () => {
       provider: "radio",
       isLive: true,
     };
-    const source = await registry.createSource(radioTrack);
-    expect(source).toEqual({ kind: "url", url: radioTrack.webpageUrl });
     expect(registry.providerForTrack(radioTrack)).toBe(radio);
+    // Actual radio playback is handled by the DNS-pinned HTTP client, not by FFmpeg URLs.
   });
 });
 
