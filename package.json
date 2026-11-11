@@ -20,7 +20,7 @@
     "@discordjs/opus": "0.10.0",
     "@discordjs/voice": "1.0.0-dev.1789257813-c626815bf",
     "discord.js": "14.27.0",
-    "pino": "10.3.1"
+    "pino": "10.4.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
