@@ -75,3 +75,15 @@ Les dépendances sont surveillées chaque semaine par Dependabot et `npm audit`.
 
 Dans le périmètre : le code source de ce dépôt, la configuration Docker et les workflows CI.
 Hors périmètre : les vulnérabilités des dépendances tierces (à signaler en amont) et l'abus d'une instance du bot que tu ne possèdes pas.
+
+### Radio and external process hardening (November 2026)
+
+The fallback radio provider checks public DNS addresses and pins the resolved address
+to the HTTP(S) socket. Every HTTP redirect is validated again; arbitrary radio
+links are never passed directly to FFmpeg. For defense in depth, configure
+`RADIO_ALLOWED_HOSTS` when only specific streaming stations are needed.
+
+Docker images pin yt-dlp via `YTDLP_VERSION` (default `2026.10.26`).
+`YTDLP_AUTO_UPDATE` defaults to `false`, so rebuild the image for reviewed
+updates. For the Node dependency tree, monitor Dependabot updates, including
+the transitive `undici` package.
