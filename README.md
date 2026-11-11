@@ -49,3 +49,17 @@ docker build -t pulse-bot:test .
 ```
 
 A real Discord voice smoke test (`/testaudio`, `/play`, `/skip`, `/leave`) is still required before public rollout.
+
+## Search performance controls
+
+Pulse reuses simultaneous identical metadata searches, caches short-lived
+flat playlists and caps concurrent yt-dlp metadata workers to avoid CPU
+and process spikes on busy servers. Audio streams are **not** cached or
+blocked by this lookup limiter.
+
+- `METADATA_MAX_CONCURRENT=3` limits simultaneous metadata subprocesses.
+- `METADATA_MAX_PENDING=64` caps waiting unique lookups; excess requests fail
+  quickly rather than growing an unlimited queue.
+- `METADATA_CACHE_TTL_MS=600000` and `METADATA_CACHE_MAX_ENTRIES=500`
+  bound the reusable metadata cache. Playlist/search cache entries are limited
+  to 5 minutes and at most 100 entries per provider.

@@ -4,6 +4,7 @@ import { env, type SponsorblockMode } from "../config/env";
 import type { RequestedBy, Track, TrackProvider } from "../music/Track";
 import { logger } from "../utils/logger";
 import { runProcess } from "../utils/process";
+import { createCachedSingleFlight, createConcurrencyLimiter } from "../utils/asyncWork";
 import { createTtlCache } from "../utils/ttlCache";
 import type { AudioProvider, AudioSource, PlaylistResult } from "./AudioProvider";
 
@@ -25,6 +26,13 @@ export interface FlatPlaylist {
   title?: string;
   entries: YtDlpInfo[];
 }
+
+// Shared by YouTube and SoundCloud: metadata extraction must not spawn an
+// unbounded number of yt-dlp processes when many servers search at once.
+const metadataLimiter = createConcurrencyLimiter(
+  env.metadataMaxConcurrent,
+  env.metadataMaxPending,
+);
 
 /**
  * Builds the SponsorBlock yt-dlp flags for the configured mode. `remove` cuts
@@ -52,6 +60,17 @@ export abstract class YtDlpProvider implements AudioProvider {
     ttlMs: env.metadataCacheTtlMs,
     maxEntries: env.metadataCacheMaxEntries,
   });
+
+  private readonly infoRequests = createCachedSingleFlight(this.infoCache);
+
+  // A short cache for *flat* playlist/mix/search entries, never media URLs.
+  // Cache keys include the item cap so small playlists are not reused for
+  // later requests with a different limit.
+  private readonly playlistCache = createTtlCache<string, FlatPlaylist>({
+    ttlMs: Math.min(env.metadataCacheTtlMs, 5 * 60_000),
+    maxEntries: Math.min(env.metadataCacheMaxEntries, 100),
+  });
+  private readonly playlistRequests = createCachedSingleFlight(this.playlistCache);
 
   /** Fallback URL built from an id when yt-dlp returns none (YouTube only). */
   protected urlFromId(_id: string): string | undefined {
@@ -179,56 +198,53 @@ export abstract class YtDlpProvider implements AudioProvider {
     return undefined;
   }
 
-  protected async fetchInfo(target: string): Promise<YtDlpInfo> {
-    const cached = this.infoCache.get(target);
-    if (cached) {
-      logger.debug({ provider: this.name, target, cached: true }, "yt-dlp metadata cache hit");
-      return cached;
-    }
-
-    const { stdout } = await runProcess(
-      env.ytdlpPath,
-      [...this.metadataArgs(), "--dump-json", "--skip-download", "--", target],
-      { timeoutMs: env.externalProcessTimeoutMs },
+  protected async runMetadata(args: string[]): Promise<{ stdout: string; stderr: string }> {
+    return metadataLimiter.run(() =>
+      runProcess(env.ytdlpPath, args, { timeoutMs: env.externalProcessTimeoutMs }),
     );
+  }
 
-    try {
-      const line = stdout.split(/\r?\n/).map((item) => item.trim()).find(Boolean);
-      if (!line) throw new Error("Réponse de métadonnées yt-dlp vide.");
-      const info = JSON.parse(line) as YtDlpInfo;
-      this.infoCache.set(target, info);
-      return info;
-    } catch {
-      throw new Error("Impossible d'analyser les métadonnées yt-dlp.");
-    }
+  protected async fetchInfo(target: string): Promise<YtDlpInfo> {
+    return this.infoRequests.get(target, async () => {
+      const { stdout } = await this.runMetadata([
+        ...this.metadataArgs(),
+        "--dump-json", "--skip-download", "--", target,
+      ]);
+
+      try {
+        const line = stdout.split(/\r?\n/).map((item) => item.trim()).find(Boolean);
+        if (!line) throw new Error("Réponse de métadonnées yt-dlp vide.");
+        return JSON.parse(line) as YtDlpInfo;
+      } catch {
+        throw new Error("Impossible d'analyser les métadonnées yt-dlp.");
+      }
+    });
   }
 
   protected async fetchEntries(target: string, limit: number): Promise<FlatPlaylist> {
-    const { stdout } = await runProcess(
-      env.ytdlpPath,
-      [
+    const cappedLimit = Math.max(1, limit);
+    const key = JSON.stringify([target, cappedLimit]);
+    return this.playlistRequests.get(key, async () => {
+      const { stdout } = await this.runMetadata([
         ...this.baseArgs(),
         "--flat-playlist",
         "--dump-single-json",
-        "--playlist-end",
-        String(Math.max(1, limit)),
-        "--",
-        target,
-      ],
-      { timeoutMs: env.externalProcessTimeoutMs },
-    );
+        "--playlist-end", String(cappedLimit),
+        "--", target,
+      ]);
 
-    try {
-      const line = stdout.split(/\r?\n/).map((item) => item.trim()).find(Boolean);
-      if (!line) throw new Error("Réponse de playlist yt-dlp vide.");
-      const parsed = JSON.parse(line) as YtDlpInfo;
-      if (Array.isArray(parsed.entries)) {
-        return { title: parsed.title, entries: parsed.entries };
+      try {
+        const line = stdout.split(/\r?\n/).map((item) => item.trim()).find(Boolean);
+        if (!line) throw new Error("Réponse de playlist yt-dlp vide.");
+        const parsed = JSON.parse(line) as YtDlpInfo;
+        return {
+          title: parsed.title,
+          entries: Array.isArray(parsed.entries) ? parsed.entries : [parsed],
+        };
+      } catch {
+        throw new Error("Impossible d'analyser les métadonnées de playlist yt-dlp.");
       }
-      return { title: parsed.title, entries: [parsed] };
-    } catch {
-      throw new Error("Impossible d'analyser les métadonnées de playlist yt-dlp.");
-    }
+    });
   }
 
   protected baseArgs(): string[] {
