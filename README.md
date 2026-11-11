@@ -28,4 +28,4 @@ For Docker, copy `.env.docker.example` to `.env.docker`, configure the token and
 docker compose up -d --build
 ```
 
-See [README.en.md](./README.en.md) for the full command reference, configuration options, architecture, and troubleshooting. Read [SECURITY.md](./SECURITY.md) before configuring credentials.
+This README is the canonical quick start. See [docs/CAHIER_DES_CHARGES.md](./docs/CAHIER_DES_CHARGES.md) for the complete project specification and [SECURITY.md](./SECURITY.md) before configuring credentials.

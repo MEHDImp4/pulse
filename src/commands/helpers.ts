@@ -58,7 +58,7 @@ export async function requireControlChannel(
 }
 
 export type PlaybackPrep =
-  | { status: "ok"; channel: VoiceBasedChannel }
+  | { status: "ok"; channel: VoiceBasedChannel; release: () => void }
   | { status: "error"; message: string };
 
 /**
@@ -95,7 +95,15 @@ export async function preparePlayback(
     };
   }
 
-  return { status: "ok", channel };
+  const release = players.reservePlaybackStart(interaction.guildId, channel.id);
+  if (!release) {
+    return {
+      status: "error",
+      message: "❌ Une autre connexion ou commande de lecture est déjà en cours sur ce serveur. Réessaie.",
+    };
+  }
+
+  return { status: "ok", channel, release };
 }
 
 export type ReadPlayerResult =

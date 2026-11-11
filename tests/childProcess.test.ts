@@ -70,6 +70,15 @@ describe("terminateAll", () => {
     expect(hasExited(asChild(process))).toBe(true);
   });
 
+  it("reports a child that ignores SIGKILL instead of claiming success", async () => {
+    const child = fakeProcess();
+    child.kill = vi.fn(() => true);
+    await expect(terminateAll([asChild(child)], {
+      graceMs: 5,
+      forceWaitMs: 10,
+    })).rejects.toThrow("did not exit");
+  });
+
   it("does not signal a process that already exited", async () => {
     const process = fakeProcess();
     process.exitCode = 0;

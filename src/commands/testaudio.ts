@@ -24,6 +24,7 @@ export const testaudio: CommandDefinition = {
     const channel = prep.channel;
 
     try {
+    try {
       const player = players.getOrCreate(interaction.guildId, channel.id);
       if (interaction.channelId) player.lastTextChannelId = interaction.channelId;
       try {
@@ -37,6 +38,9 @@ export const testaudio: CommandDefinition = {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
       await interaction.editReply(`❌ Test audio impossible : ${message}`);
+    }
+    } finally {
+      prep.release();
     }
   },
 };

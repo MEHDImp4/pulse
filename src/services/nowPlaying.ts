@@ -48,6 +48,8 @@ export function playerSnapshot(player: GuildPlayer): NowPlayingSnapshot | undefi
 // Last rendered signature per session, so identical frames are not re-sent to
 // Discord (e.g. a paused card no longer issues a REST edit every second).
 const lastSignatures = new Map<string, string>();
+// Coordinate timer edits and immediate button-triggered edits for each session.
+const inFlight = new Set<string>();
 const MAX_SIGNATURES = 5_000;
 
 function rememberSignature(sessionId: string, signature: string): void {
@@ -75,14 +77,18 @@ export async function refreshNowPlaying(player: GuildPlayer): Promise<void> {
   const snapshot = playerSnapshot(player);
   if (!message || !snapshot) return;
 
+  const key = player.sessionId;
   const signature = renderSignature(snapshot);
-  if (lastSignatures.get(player.sessionId) === signature) return;
+  if (lastSignatures.get(key) === signature || inFlight.has(key)) return;
 
+  inFlight.add(key);
   try {
     await message.edit(buildPayload(player));
-    rememberSignature(player.sessionId, signature);
+    rememberSignature(key, signature);
   } catch (error) {
     logger.debug({ err: error, guild: player.guildId }, "Immediate now playing update failed");
+  } finally {
+    inFlight.delete(key);
   }
 }
 
@@ -94,8 +100,7 @@ export async function refreshNowPlaying(player: GuildPlayer): Promise<void> {
  * while the rendered card would be identical (so a paused card is not rewritten
  * every second). Returns a stop function.
  */
-export function startNowPlayingUpdater(players: PlayerManager, intervalMs = 1_000): () => void {
-  const inFlight = new Set<string>();
+export function startNowPlayingUpdater(players: PlayerManager, intervalMs = 5_000): () => void {
 
   const timer = setInterval(() => {
     for (const player of players.activePlayers()) {
