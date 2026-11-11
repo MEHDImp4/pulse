@@ -92,14 +92,17 @@ describe("PlayerManager", () => {
     expect(manager.getForGuild("guild-b")).toEqual([]);
   });
 
-  it("rejects rebinding a session into an existing target without overwriting it", () => {
+  it("evicts a stale destination when moving an active session to its channel", async () => {
     const manager = new PlayerManager(new StubProvider());
     const first = manager.getOrCreate("guild-a", "chan-1");
-    const second = manager.getOrCreate("guild-a", "chan-2");
-    expect(() => manager.rebind("guild-a", "chan-1", "chan-2")).toThrow("already exists");
-    expect(manager.get("guild-a", "chan-1")).toBe(first);
-    expect(manager.get("guild-a", "chan-2")).toBe(second);
-    expect(manager.getForGuild("guild-a")).toHaveLength(2);
+    const stale = manager.getOrCreate("guild-a", "chan-2");
+    expect(manager.rebind("guild-a", "chan-1", "chan-2")).toBe(first);
+    expect(manager.get("guild-a", "chan-1")).toBeUndefined();
+    expect(manager.get("guild-a", "chan-2")).toBe(first);
+    expect(manager.getForGuild("guild-a")).toEqual([first]);
+    expect(manager.getForGuild("guild-a")).not.toContain(stale);
+    await stale.destroy();
+    expect(manager.getForGuild("guild-a")).toEqual([first]);
   });
 
   it("rebinds a session when the bot is moved to another channel", () => {

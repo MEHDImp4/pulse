@@ -97,7 +97,18 @@ export class PlayerManager {
 
     const target = this.players.get(toId);
     if (target && target !== player) {
-      throw new Error("Cannot rebind into a session that already exists");
+      if (target.isConnected) {
+        // Do not throw from Discord's VoiceStateUpdate listener.
+        logger.warn({ guild: guildId, to: toChannelId }, "Cannot rebind into an active session");
+        return undefined;
+      }
+      // A stale target session can exist from previous commands. Evict it
+      // before replacing the key, otherwise the guild index retains a ghost.
+      this.players.delete(toId);
+      this.playersByGuild.get(guildId)?.delete(target);
+      void target.destroy().catch((error) => {
+        logger.warn({ err: error, guild: guildId }, "Failed to clean stale destination session");
+      });
     }
 
     this.players.delete(fromId);
