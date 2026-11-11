@@ -5,6 +5,11 @@ export interface RunProcessOptions {
   maxOutputBytes?: number;
 }
 
+/**
+ * Spawn an external tool with bounded output and deadline. Collect Buffer
+ * chunks and concatenate only once: repeated string concatenation formerly
+ * copied the entire output on every stdout/stderr event.
+ */
 export async function runProcess(
   executable: string,
   args: string[],
@@ -19,64 +24,59 @@ export async function runProcess(
       windowsHide: true,
     });
 
-    let stdout = "";
-    let stderr = "";
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
     let settled = false;
 
-    const timer = setTimeout(() => {
+    const fail = (error: Error): void => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       child.kill("SIGKILL");
-      reject(new Error(`${executable} timed out after ${options.timeoutMs} ms`));
-    }, options.timeoutMs);
-
-    const append = (current: string, chunk: Buffer): string => {
-      const next = current + chunk.toString("utf8");
-      if (Buffer.byteLength(next, "utf8") > maxOutputBytes) {
-        child.kill("SIGKILL");
-        throw new Error(`${executable} produced too much output`);
-      }
-      return next;
+      reject(error);
     };
+
+    const timer = setTimeout(() => {
+      fail(new Error(`${executable} timed out after ${options.timeoutMs} ms`));
+    }, options.timeoutMs);
 
     child.stdout.on("data", (chunk: Buffer) => {
       if (settled) return;
-      try {
-        stdout = append(stdout, chunk);
-      } catch (error) {
-        settled = true;
-        clearTimeout(timer);
-        reject(error);
+      stdoutBytes += chunk.byteLength;
+      if (stdoutBytes > maxOutputBytes) {
+        fail(new Error(`${executable} produced too much output`));
+        return;
       }
+      stdoutChunks.push(chunk);
     });
 
     child.stderr.on("data", (chunk: Buffer) => {
       if (settled) return;
-      try {
-        stderr = append(stderr, chunk);
-      } catch (error) {
-        settled = true;
-        clearTimeout(timer);
-        reject(error);
+      stderrBytes += chunk.byteLength;
+      if (stderrBytes > maxOutputBytes) {
+        fail(new Error(`${executable} produced too much output`));
+        return;
       }
+      stderrChunks.push(chunk);
     });
 
-    child.on("error", (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(error);
-    });
+    child.on("error", (error) => fail(error));
 
     child.on("close", (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      const stderr = Buffer.concat(stderrChunks, stderrBytes).toString("utf8");
       if (code !== 0) {
-        reject(new Error(`${executable} exited with code ${code}: ${stderr.trim()}`));
+        reject(new Error(`${executable} exited with code ${code}: ${stderr.trim().slice(-8000)}`));
         return;
       }
-      resolve({ stdout, stderr });
+      resolve({
+        stdout: Buffer.concat(stdoutChunks, stdoutBytes).toString("utf8"),
+        stderr,
+      });
     });
   });
 }

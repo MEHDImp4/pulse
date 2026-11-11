@@ -1,6 +1,7 @@
 import { fetchJson } from "../utils/http";
 import { logger } from "../utils/logger";
 import { createTtlCache } from "../utils/ttlCache";
+import { createCachedSingleFlight } from "../utils/asyncWork";
 
 export interface Suggestion {
   name: string;
@@ -41,7 +42,12 @@ export class YouTubeSuggestions implements SuggestionsProvider {
     maxEntries: CACHE_MAX_ENTRIES,
   });
 
-  constructor(private readonly timeoutMs = 800) {}
+  private readonly requests = createCachedSingleFlight(this.cache);
+
+  constructor(
+    private readonly timeoutMs = 800,
+    private readonly request: typeof fetchJson = fetchJson,
+  ) {}
 
   async suggest(query: string, limit = 10): Promise<Suggestion[]> {
     const trimmed = query.trim();
@@ -50,20 +56,16 @@ export class YouTubeSuggestions implements SuggestionsProvider {
     // Repeated keystrokes resolve to the same query; serve them from a short
     // TTL cache instead of hitting the network every time.
     const cacheKey = `${limit}:${trimmed.toLowerCase()}`;
-    const cached = this.cache.get(cacheKey);
-    if (cached) return cached;
-
-    const url = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(trimmed)}`;
-
     try {
-      const payload = await fetchJson(url, {
-        timeoutMs: this.timeoutMs,
-        maxBytes: 200_000,
-        headers: { "User-Agent": "Mozilla/5.0" },
+      return await this.requests.get(cacheKey, async () => {
+        const url = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(trimmed)}`;
+        const payload = await this.request(url, {
+          timeoutMs: this.timeoutMs,
+          maxBytes: 200_000,
+          headers: { "User-Agent": "Mozilla/5.0" },
+        });
+        return parseSuggestions(payload, limit);
       });
-      const choices = parseSuggestions(payload, limit);
-      this.cache.set(cacheKey, choices);
-      return choices;
     } catch (error) {
       logger.debug({ err: error }, "Suggestion lookup failed");
       return [];
