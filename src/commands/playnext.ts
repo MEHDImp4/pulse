@@ -33,6 +33,7 @@ export const playnext: CommandDefinition = {
     }
     const channel = prep.channel;
 
+    try {
     const query = interaction.options.getString("query", true);
 
     try {
@@ -63,6 +64,9 @@ export const playnext: CommandDefinition = {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
       await interaction.editReply(`❌ Impossible d'ajouter ce morceau : ${message}`);
+    }
+    } finally {
+      prep.release();
     }
   },
 };

@@ -1,6 +1,7 @@
 import { env } from "../config/env";
 import type { RequestedBy, Track, TrackProvider } from "../music/Track";
-import { assertSafeRemoteUrl, isSafeRemoteUrl, lookupHost, type HostResolver } from "../utils/net";
+import { isSafeRemoteUrl, lookupHost, type HostResolver } from "../utils/net";
+import { openSafeRadioStream } from "./SafeRadioStream";
 import type { AudioProvider, AudioSource } from "./AudioProvider";
 
 export function deriveRadioTitle(url: string): string {
@@ -48,10 +49,10 @@ export class RadioProvider implements AudioProvider {
   }
 
   async createSource(track: Track): Promise<AudioSource> {
-    await assertSafeRemoteUrl(track.webpageUrl, {
+    const source = await openSafeRadioStream(track.webpageUrl, {
       allowedHosts: this.allowedHosts,
       resolveHost: this.resolveHost,
     });
-    return { kind: "url", url: track.webpageUrl };
+    return { kind: "stream", ...source };
   }
 }

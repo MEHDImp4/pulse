@@ -28,4 +28,24 @@ For Docker, copy `.env.docker.example` to `.env.docker`, configure the token and
 docker compose up -d --build
 ```
 
-See [README.en.md](./README.en.md) for the full command reference, configuration options, architecture, and troubleshooting. Read [SECURITY.md](./SECURITY.md) before configuring credentials.
+This README is the canonical quick start. See [docs/CAHIER_DES_CHARGES.md](./docs/CAHIER_DES_CHARGES.md) for the complete project specification and [SECURITY.md](./SECURITY.md) before configuring credentials.
+
+## Operational safety
+
+- `/status` displays diagnostics only for the invoking Discord server (not the other servers using this bot).
+- Radio streams are opened through a DNS-pinned HTTP(S) client with public-address and per-redirect checks. FFmpeg only receives validated audio bytes, not arbitrary URLs.
+- To restrict radio traffic, set `RADIO_ALLOWED_HOSTS` to a comma-separated list of exact domain names.
+- The Dockerfile pins yt-dlp to a tested stable release. Runtime self-update is **disabled** by default; upgrade via an image rebuild after review.
+- Live now-playing cards refresh every 5 seconds by default (`NOWPLAYING_INTERVAL_MS`, minimum 2000 ms) to reduce Discord REST traffic.
+
+Quality gates:
+
+```sh
+npm ci
+npm run typecheck
+npm run build
+npm test
+docker build -t pulse-bot:test .
+```
+
+A real Discord voice smoke test (`/testaudio`, `/play`, `/skip`, `/leave`) is still required before public rollout.

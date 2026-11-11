@@ -22,6 +22,20 @@ class StubProvider implements AudioProvider {
 }
 
 describe("PlayerManager", () => {
+  it("reserves a guild atomically while joining a voice session", () => {
+    const manager = new PlayerManager(new StubProvider());
+    const release = manager.reservePlaybackStart("guild-a", "chan-1");
+    expect(release).toBeTypeOf("function");
+    expect(manager.reservePlaybackStart("guild-a", "chan-2")).toBeUndefined();
+    expect(manager.reservePlaybackStart("guild-a", "chan-1")).toBeUndefined();
+    const other = manager.reservePlaybackStart("guild-b", "chan-2");
+    expect(other).toBeTypeOf("function");
+    release?.();
+    release?.(); // idempotent
+    expect(manager.reservePlaybackStart("guild-a", "chan-2")).toBeTypeOf("function");
+    other?.();
+  });
+
   it("returns one player per guild+channel and isolates sessions", () => {
     const manager = new PlayerManager(new StubProvider());
     const a1 = manager.getOrCreate("guild-a", "chan-1");

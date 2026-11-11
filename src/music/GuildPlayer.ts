@@ -70,6 +70,7 @@ export class GuildPlayer {
   private readonly pipeline: AudioPipeline;
   private connection?: VoiceConnection;
   private childProcesses: ChildProcess[] = [];
+  private sourceCleanup?: () => void;
   private currentResource?: AudioResource;
   private idleTimer?: NodeJS.Timeout;
   private emptyChannelTimer?: NodeJS.Timeout;
@@ -854,10 +855,11 @@ export class GuildPlayer {
     try {
       for (let attempt = 1; attempt <= attempts; attempt++) {
         try {
-          const { processes, resource } = await this.pipeline.create(track, this._volume, {
+          const { processes, resource, cleanup } = await this.pipeline.create(track, this._volume, {
             filter: this._filter,
             startSeconds,
           });
+          this.sourceCleanup = cleanup;
           this.childProcesses = processes;
           this.currentResource = resource;
           this.audioPlayer.play(resource);
@@ -934,6 +936,13 @@ export class GuildPlayer {
   private async killProcesses(): Promise<void> {
     const processes = this.childProcesses;
     this.childProcesses = [];
+    const cleanup = this.sourceCleanup;
+    this.sourceCleanup = undefined;
+    try {
+      cleanup?.();
+    } catch (error) {
+      logger.warn({ err: error, guild: this.guildId }, "Failed to close active source");
+    }
     if (processes.length === 0) return;
 
     await terminateAll(processes, {

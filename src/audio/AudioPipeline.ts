@@ -17,6 +17,7 @@ function redactUrls(text: string): string {
 export interface AudioPipelineResult {
   processes: ChildProcess[];
   resource: AudioResource<Track>;
+  cleanup?: () => void;
 }
 
 export interface AudioPipelineOptions {
@@ -71,12 +72,14 @@ export class AudioPipeline {
 
     const processes: ChildProcess[] = [];
 
-    if (source.kind === "pipe") {
+    if (source.kind === "pipe" || source.kind === "stream") {
       source.stream.pipe(ffmpeg.stdin);
       source.stream.on("error", (error) => {
         logger.error({ err: error, track: track.title }, "Source stream error");
+        ffmpeg.stdin.destroy(error);
       });
-      processes.push(source.process);
+      if (source.kind === "pipe") processes.push(source.process);
+      else ffmpeg.once("close", source.close);
     }
 
     ffmpeg.stdin.on("error", (error) => {
@@ -122,6 +125,10 @@ export class AudioPipeline {
       resource.volume.setVolume(percentToGain(volume, env.volumeHeadroomDb, env.volumeRangeDb));
     }
 
-    return { processes, resource };
+    return {
+      processes,
+      resource,
+      cleanup: source.kind === "stream" ? source.close : undefined,
+    };
   }
 }

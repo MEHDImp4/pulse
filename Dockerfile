@@ -11,8 +11,10 @@ RUN apt-get update \
 
 # yt-dlp lives in an isolated venv owned by the runtime user, so the entrypoint
 # can self-update it without root or --break-system-packages.
+# Pin yt-dlp to a tested stable release; bump this argument in a reviewed PR.
+ARG YTDLP_VERSION=2026.10.26
 RUN python3 -m venv /opt/ytdlp \
-    && /opt/ytdlp/bin/pip install --no-cache-dir --upgrade --pre "yt-dlp[default]" \
+    && /opt/ytdlp/bin/pip install --no-cache-dir "yt-dlp[default]==${YTDLP_VERSION}" \
     && chown -R node:node /opt/ytdlp
 
 WORKDIR /app

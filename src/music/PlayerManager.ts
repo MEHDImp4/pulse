@@ -14,6 +14,9 @@ import type { RequestedBy, Track } from "./Track";
 
 export class PlayerManager {
   private readonly players = new Map<string, GuildPlayer>();
+  // Reserve a guild while a playback command is resolving metadata/joining.
+  // This closes the race between preparePlayback() and getOrCreate().
+  private readonly playbackReservations = new Map<string, string>();
   private readonly settings: GuildSettingsStore;
   private readonly queueStore?: QueueStore;
 
@@ -53,6 +56,24 @@ export class PlayerManager {
    */
   findGuildConflict(guildId: string, channelId: string): GuildPlayer | undefined {
     return findConflictingSession(this.getForGuild(guildId), channelId);
+  }
+
+  /**
+   * Atomic in-process claim for a guild's initial join. The caller MUST release
+   * it in a finally block after resolving the track and joining the channel.
+   * Existing connected sessions still reject joins to other voice channels.
+   */
+  reservePlaybackStart(guildId: string, channelId: string): (() => void) | undefined {
+    if (this.playbackReservations.has(guildId) || this.findGuildConflict(guildId, channelId)) {
+      return undefined;
+    }
+    const reservation = `${channelId}:${Date.now()}:${Math.random()}`;
+    this.playbackReservations.set(guildId, reservation);
+    return () => {
+      if (this.playbackReservations.get(guildId) === reservation) {
+        this.playbackReservations.delete(guildId);
+      }
+    };
   }
 
   /** Returns the player currently attached to a voice channel, across guilds. */

@@ -35,6 +35,7 @@ export const play: CommandDefinition = {
     }
     const channel = prep.channel;
 
+    try {
     const query = interaction.options.getString("query", true);
 
     if (players.isPlaylistInput(query)) {
@@ -73,6 +74,9 @@ export const play: CommandDefinition = {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
       await interaction.editReply(`❌ Impossible de lire ce morceau : ${message}`);
+    }
+    } finally {
+      prep.release();
     }
   },
 };

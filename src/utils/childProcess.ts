@@ -5,6 +5,8 @@ export interface TerminateOptions {
   graceMs?: number;
   /** Called for every process that had to be force-killed. */
   onForceKill?: (process: ChildProcess) => void;
+  /** Maximum wait after SIGKILL before reporting an unresponsive child (ms). */
+  forceWaitMs?: number;
 }
 
 export function hasExited(process: ChildProcess): boolean {
@@ -62,5 +64,15 @@ export async function terminateAll(
         options.onForceKill?.(process);
       }
     }
+
+    // SIGKILL only requests termination. Wait for the actual exit event
+    // before reporting that FFmpeg / yt-dlp children are cleaned up.
+    const allExited = await Promise.race([
+      Promise.all(exits).then(() => true),
+      new Promise<false>((resolve) => {
+        setTimeout(() => resolve(false), options.forceWaitMs ?? 1_000).unref();
+      }),
+    ]);
+    if (!allExited) throw new Error("A child process did not exit after SIGKILL");
   }
 }

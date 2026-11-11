@@ -14,13 +14,20 @@ export interface PipeSource {
   process: ChildProcess;
 }
 
-/** Audio fetched directly by FFmpeg (radio / direct HTTP streams). */
+/** Already-validated stream handled by Node; FFmpeg only receives its bytes. */
+export interface StreamSource {
+  kind: "stream";
+  stream: Readable;
+  close: () => void;
+}
+
+/** Direct URL sources from trusted providers (not used for arbitrary radio links). */
 export interface UrlSource {
   kind: "url";
   url: string;
 }
 
-export type AudioSource = PipeSource | UrlSource;
+export type AudioSource = PipeSource | StreamSource | UrlSource;
 
 export interface AudioProvider {
   readonly name: TrackProvider;

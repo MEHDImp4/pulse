@@ -43,6 +43,10 @@ export const playlist: CommandDefinition = {
     const url = interaction.options.getString("url", true);
     const limit = interaction.options.getInteger("limit") ?? env.playlistMaxItems;
 
-    await importPlaylist(interaction, players, channel, url, limit);
+    try {
+      await importPlaylist(interaction, players, channel, url, limit);
+    } finally {
+      prep.release();
+    }
   },
 };
