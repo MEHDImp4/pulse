@@ -79,6 +79,32 @@ describe("PlayerManager", () => {
     expect(manager.getForChannel("chan-x")).toBeUndefined();
   });
 
+  it("keeps the guild index in sync after destroying a session", async () => {
+    const manager = new PlayerManager(new StubProvider());
+    manager.getOrCreate("guild-a", "chan-1");
+    manager.getOrCreate("guild-a", "chan-2");
+    manager.getOrCreate("guild-b", "chan-3");
+    await manager.destroy("guild-a", "chan-1");
+    expect(manager.getForGuild("guild-a").map((p) => p.channelId)).toEqual(["chan-2"]);
+    expect(manager.getForGuild("guild-b")).toHaveLength(1);
+    await manager.destroyAll();
+    expect(manager.getForGuild("guild-a")).toEqual([]);
+    expect(manager.getForGuild("guild-b")).toEqual([]);
+  });
+
+  it("evicts a stale destination when moving an active session to its channel", async () => {
+    const manager = new PlayerManager(new StubProvider());
+    const first = manager.getOrCreate("guild-a", "chan-1");
+    const stale = manager.getOrCreate("guild-a", "chan-2");
+    expect(manager.rebind("guild-a", "chan-1", "chan-2")).toBe(first);
+    expect(manager.get("guild-a", "chan-1")).toBeUndefined();
+    expect(manager.get("guild-a", "chan-2")).toBe(first);
+    expect(manager.getForGuild("guild-a")).toEqual([first]);
+    expect(manager.getForGuild("guild-a")).not.toContain(stale);
+    await stale.destroy();
+    expect(manager.getForGuild("guild-a")).toEqual([first]);
+  });
+
   it("rebinds a session when the bot is moved to another channel", () => {
     const manager = new PlayerManager(new StubProvider());
     const player = manager.getOrCreate("guild-a", "chan-1");

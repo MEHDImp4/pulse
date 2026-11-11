@@ -14,6 +14,9 @@ import type { RequestedBy, Track } from "./Track";
 
 export class PlayerManager {
   private readonly players = new Map<string, GuildPlayer>();
+  // VoiceStateUpdate is frequent. Index sessions by guild so a voice event
+  // never needs to scan every server's sessions.
+  private readonly playersByGuild = new Map<string, Set<GuildPlayer>>();
   // Reserve a guild while a playback command is resolving metadata/joining.
   // This closes the race between preparePlayback() and getOrCreate().
   private readonly playbackReservations = new Map<string, string>();
@@ -43,10 +46,7 @@ export class PlayerManager {
    * guild per bot, so at most one of them is connected at a time.
    */
   getForGuild(guildId: string): GuildPlayer[] {
-    const prefix = `${guildId}:`;
-    return [...this.players.entries()]
-      .filter(([sessionId]) => sessionId.startsWith(prefix))
-      .map(([, player]) => player);
+    return [...(this.playersByGuild.get(guildId) ?? [])];
   }
 
   /**
@@ -95,6 +95,22 @@ export class PlayerManager {
     const player = this.players.get(fromId);
     if (!player) return this.get(guildId, toChannelId);
 
+    const target = this.players.get(toId);
+    if (target && target !== player) {
+      if (target.isConnected) {
+        // Do not throw from Discord's VoiceStateUpdate listener.
+        logger.warn({ guild: guildId, to: toChannelId }, "Cannot rebind into an active session");
+        return undefined;
+      }
+      // A stale target session can exist from previous commands. Evict it
+      // before replacing the key, otherwise the guild index retains a ghost.
+      this.players.delete(toId);
+      this.playersByGuild.get(guildId)?.delete(target);
+      void target.destroy().catch((error) => {
+        logger.warn({ err: error, guild: guildId }, "Failed to clean stale destination session");
+      });
+    }
+
     this.players.delete(fromId);
     player.bindChannel(toChannelId);
     this.players.set(toId, player);
@@ -118,7 +134,12 @@ export class PlayerManager {
       channelId,
       this.provider,
       (id) => {
-        if (this.players.get(id) === player) this.players.delete(id);
+        if (this.players.get(id) === player) {
+          this.players.delete(id);
+          const inGuild = this.playersByGuild.get(guildId);
+          inGuild?.delete(player);
+          if (inGuild?.size === 0) this.playersByGuild.delete(guildId);
+        }
       },
       (textChannelId, content) => {
         void this.notify(textChannelId, content);
@@ -133,6 +154,12 @@ export class PlayerManager {
       (seed, exclude) => this.autoplayRelated(seed, exclude),
     );
     this.players.set(sessionId, player);
+    let inGuild = this.playersByGuild.get(guildId);
+    if (!inGuild) {
+      inGuild = new Set<GuildPlayer>();
+      this.playersByGuild.set(guildId, inGuild);
+    }
+    inGuild.add(player);
     this.restoreQueue(player);
     return player;
   }
@@ -267,12 +294,18 @@ export class PlayerManager {
     const player = this.players.get(sessionId);
     if (player) await player.destroy();
     this.players.delete(sessionId);
+    if (player) {
+      const inGuild = this.playersByGuild.get(guildId);
+      inGuild?.delete(player);
+      if (inGuild?.size === 0) this.playersByGuild.delete(guildId);
+    }
     this.queueStore?.delete(sessionId);
   }
 
   async destroyAll(): Promise<void> {
     await Promise.all([...this.players.values()].map((player) => player.destroy()));
     this.players.clear();
+    this.playersByGuild.clear();
   }
 
   getGuildSettings(sessionId: string, guildId: string): GuildSettings {

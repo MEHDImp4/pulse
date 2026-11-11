@@ -62,6 +62,8 @@ export const env = {
   externalProcessTimeoutMs: intEnv("EXTERNAL_PROCESS_TIMEOUT_MS", 20_000),
   metadataCacheTtlMs: intEnv("METADATA_CACHE_TTL_MS", 600_000),
   metadataCacheMaxEntries: intEnv("METADATA_CACHE_MAX_ENTRIES", 500),
+  metadataMaxConcurrent: Math.max(1, intEnv("METADATA_MAX_CONCURRENT", 3)),
+  metadataMaxPending: intEnv("METADATA_MAX_PENDING", 64),
   voiceConnectionTimeoutMs: intEnv("VOICE_CONNECTION_TIMEOUT_MS", 20_000),
   commandCooldownSeconds: intEnv("COMMAND_COOLDOWN_SECONDS", 5),
   autoDeleteSeconds: intEnv("AUTO_DELETE_SECONDS", 1),
