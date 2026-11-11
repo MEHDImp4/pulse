@@ -47,7 +47,7 @@ export class SpotifyProvider extends MetadataProvider {
     searcher: MetadataProvider["searcher"],
     private readonly clientId: string,
     private readonly clientSecret: string,
-    private readonly refreshToken?: string,
+    private readonly userRefreshToken?: string,
   ) {
     super(searcher);
   }
@@ -80,7 +80,7 @@ export class SpotifyProvider extends MetadataProvider {
   async resolvePlaylist(url: string, requestedBy: RequestedBy, limit = 50): Promise<PlaylistResult> {
     const id = playlistId(url, "spotify");
     if (!id) throw new Error("Lien de playlist Spotify invalide.");
-    if (!this.refreshToken) {
+    if (!this.userRefreshToken) {
       throw new Error("Spotify exige un OAuth utilisateur pour les playlists. Configure SPOTIFY_REFRESH_TOKEN avec un compte propriétaire/collaborateur.");
     }
     const token = await this.getUserToken();
@@ -108,14 +108,14 @@ export class SpotifyProvider extends MetadataProvider {
   }
 
   private async getUserToken(): Promise<string> {
-    if (!this.refreshToken) throw new Error("SPOTIFY_REFRESH_TOKEN manquant");
+    if (!this.userRefreshToken) throw new Error("SPOTIFY_REFRESH_TOKEN manquant");
     if (this.userToken && this.userToken.expiresAt > Date.now() + 30_000) return this.userToken.value;
     this.userTokenPromise ??= (async () => {
       const basic = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64");
       const payload = await fetchJson("https://accounts.spotify.com/api/token", {
         method: "POST",
         headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: this.refreshToken! }).toString(),
+        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: this.userRefreshToken! }).toString(),
       }) as SpotifyTokenResponse;
       const value = asString(payload.access_token);
       if (!value) throw new Error("Échec du renouvellement OAuth Spotify.");
