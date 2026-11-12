@@ -144,3 +144,13 @@ saved in `DATA_DIR/listening-stats.json` (no listener IDs are stored).
 The AutoDJ candidate ranking prefers a similar duration/artist and
 penalizes karaoke, slowed and cover versions unless those keywords
 appear in the source track. Recommendations still contain randomness.
+
+## Installer sur Unraid
+
+Le template [Pulse-Discord-Music](./templates/unraid/pulse.xml) est conçu
+pour Docker → Add Container, avec les deux champs Discord requis, AppData
+persistant et aucun port ouvert par défaut. Voir le [guide Unraid](./docs/DOCKER_INSTALL.md#4-installation-native-unraid-sans-docker-compose).
+
+Le dépôt fournit aussi le fichier `ca_profile.xml` permettant de préparer
+une candidature au catalogue Community Applications. La présence de ce fichier
+**ne signifie pas** que l'app a déjà été acceptée dans le catalogue Unraid.

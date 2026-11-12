@@ -123,31 +123,80 @@ partager un réseau Docker ou disposer d'une liaison interne sécurisée.
 Le dashboard exige OAuth2 Discord et revérifie les droits de gestion du
 serveur pour chaque requête API. Ne pas utiliser une URL HTTP publique.
 
-## 4. Installation Unraid
+## 4. Installation native Unraid (sans Docker Compose)
 
-Le template est dans
+**Pulse Discord Music** et le conteneur de monitoring nommé simplement
+**Pulse** sont deux applications différentes : ne pas les confondre.
+
+### Méthode A — Template Unraid (disponible immédiatement)
+
+Le template source est
 [templates/unraid/pulse.xml](../templates/unraid/pulse.xml).
+Sur Unraid 6.10+ l'ancien menu « Template repositories » n'est plus
+présent sur de nombreuses versions : pour utiliser un template non
+encore répertorié dans Community Applications, vous pouvez l'installer
+en une commande dans le terminal Unraid :
 
-On peut créer un conteneur avec ce modèle en copiant le XML dans
-`/boot/config/plugins/dockerMan/templates-user/my-pulse.xml`, puis en
-sélectionnant le modèle dans **Docker → Add Container**.
+```sh
+mkdir -p /boot/config/plugins/dockerMan/templates-user
+wget -q -O /boot/config/plugins/dockerMan/templates-user/my-pulse-discord-music.xml \
+  https://raw.githubusercontent.com/MEHDImp4/pulse/master/templates/unraid/pulse.xml
+```
 
-Configuration minimale :
+Ensuite, uniquement dans l'interface web : **Docker → Add Container →
+Template → Pulse-Discord-Music**.
 
-| Champ | Valeur |
+Renseigner seulement les deux champs requis :
+**Discord Bot Token** et **Discord Application ID**, puis cliquez sur
+**Apply/Create**. Le conteneur télécharge l'image, corrige les permissions
+d'AppData, exécute le bot avec un utilisateur non privilégié et enregistre
+automatiquement les slash commands. Aucun port n'est requis pour le bot.
+
+| Option Unraid | Valeur par défaut |
 |---|---|
 | Repository | `ghcr.io/mehdimp4/pulse:latest` |
-| Discord Bot Token | Token du bot |
-| Discord Application ID | Application ID |
-| AppData | `/mnt/user/appdata/pulse` → `/data` |
-| Dashboard Port | `0` si le dashboard est désactivé |
+| AppData | `/mnt/user/appdata/pulse-discord-music` → `/data` |
+| DATA_DIR | `/data` |
+| Dashboard | désactivé (`DASHBOARD_PORT=0`) |
+| Permissions Linux | amorçage pour AppData, puis utilisateur `node` non privilégié |
 
-Le dashboard peut fonctionner avec Nginx Proxy Manager, mais le port 8080
-doit rester derrière un proxy HTTPS et ne doit pas être exposé directement
-sur Internet.
+Pour récupérer une future version du template, relancer la commande
+de téléchargement. Les paramètres de conteneurs existants sont conservés
+par Unraid dans leurs propres templates utilisateur.
 
-Ne jamais partager son template Unraid après l'avoir rempli avec des
-identifiants.
+### Méthode B — Community Applications
+
+Le dépôt inclut désormais `ca_profile.xml`, un template au format
+Community Applications et les informations de licence et de support.
+**L'application n'apparaîtra pas automatiquement** dans l'onglet Apps :
+le propriétaire du projet doit soumettre le dépôt
+[MEHDImp4/pulse](https://github.com/MEHDImp4/pulse) sur
+[ca.unraid.net/submit/new](https://ca.unraid.net/submit/new), lancer
+**Validate** et **Scan**, puis obtenir la validation de l'équipe Unraid.
+Le catalogue contient déjà un autre logiciel nommé Pulse ; cette fiche
+utilise donc le nom distinct **Pulse Discord Music**.
+
+Une fois approuvée, il suffira d'ouvrir **Apps**, chercher
+« Pulse Discord Music » et cliquer **Install**.
+
+### Dashboard sur Unraid
+
+Le dashboard OAuth2 est optionnel et reste désactivé par défaut.
+Pour l'activer, renseigner `DASHBOARD_PORT=8080`, `DASHBOARD_PUBLIC_URL`
+avec un domaine HTTPS et `DASHBOARD_CLIENT_SECRET`. Ajouter l'URL
+`https://votre-domaine/oauth/callback` dans Discord OAuth2 Redirects.
+
+Le template **n'ouvre aucun port HTTP par défaut**. Configurer un
+réseau Docker partagé avec Nginx Proxy Manager / Caddy ou ajouter
+explicitement un mappage de port sécurisé, avec un reverse proxy TLS.
+Ne pas ouvrir directement le port du dashboard sur Internet.
+
+En cas de refus d'accès GHCR, le package est peut-être privé :
+aller sur GitHub → Packages → pulse → Package settings, puis rendre
+le package public. Ne pas renseigner un token GitHub dans le template
+Unraid pour contourner une image privée destinée à être publique.
+
+Ne partagez jamais votre template après avoir renseigné des secrets.
 
 ## 5. Build local de développement
 
