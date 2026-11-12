@@ -30,6 +30,11 @@ RUN npm run build && npm prune --omit=dev
 # --- Runtime stage -----------------------------------------------------------
 FROM node:24-bookworm-slim AS runtime
 
+LABEL org.opencontainers.image.source="https://github.com/MEHDImp4/pulse" \
+      org.opencontainers.image.title="Pulse Discord Music Bot" \
+      org.opencontainers.image.description="Discord music bot with optional OAuth dashboard" \
+      org.opencontainers.image.licenses="MIT"
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg python3 ca-certificates procps \
     && rm -rf /var/lib/apt/lists/*

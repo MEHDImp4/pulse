@@ -22,11 +22,14 @@ npm run dev
 
 Set `DISCORD_TOKEN` and `DISCORD_CLIENT_ID` in `.env`. Add `DISCORD_GUILD_ID` for development commands scoped to one server.
 
-For Docker, copy `.env.docker.example` to `.env.docker`, configure the token and client ID, then run:
+**Docker / Unraid (no build required):** See [docs/DOCKER_INSTALL.md](./docs/DOCKER_INSTALL.md) for an image-based install with a guided credential setup, a Compose template, optional OAuth dashboard and Unraid configuration.
 
 ```sh
-docker compose up -d --build
+sh scripts/docker-setup.sh
+docker compose up -d
 ```
+
+The container synchronizes Discord slash commands automatically on startup (unless disabled). The published GHCR image will become pullable after the Docker release workflow runs from `master`. Until then, use the local build override documented in the install guide.
 
 This README is the canonical quick start. See [docs/CAHIER_DES_CHARGES.md](./docs/CAHIER_DES_CHARGES.md) for the complete project specification and [SECURITY.md](./SECURITY.md) before configuring credentials.
 

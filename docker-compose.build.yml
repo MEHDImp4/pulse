@@ -1,0 +1,8 @@
+# Optional developer override: build locally instead of pulling a published GHCR image.
+# docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  bot:
+    image: pulse:local
+    build:
+      context: .
+      dockerfile: Dockerfile
