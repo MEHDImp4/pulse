@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/pulse-icon.png" width="128" height="128" alt="Pulse — logo casque et onde musicale" /></p>
+
 <h1 align="center">Pulse</h1>
 
 <p align="center"><strong>Your music. Your server. Your rules.</strong></p>

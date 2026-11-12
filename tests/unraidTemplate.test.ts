@@ -12,6 +12,16 @@ describe("Unraid Community Applications template", () => {
     expect(profile).toContain("<CommunityApplications>");
     expect(profile).toContain("<Profile>");
   });
+  it("uses the committed Pulse icon for Unraid and Community Apps", () => {
+    const url = "https://raw.githubusercontent.com/MEHDImp4/pulse/master/assets/pulse-icon.png";
+    expect(xml).toContain(`<Icon>${url}</Icon>`);
+    expect(profile).toContain(`<Icon>${url}</Icon>`);
+
+    const icon = readFileSync("assets/pulse-icon.png");
+    expect(icon.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(icon.readUInt32BE(16)).toBe(96);
+    expect(icon.readUInt32BE(20)).toBe(96);
+  });
   it("keeps persistent data and bot credentials explicit", () => {
     expect(xml).toMatch(/Target="\/data"[^>]*Type="Path"/);
     expect(xml).toMatch(/Target="DATA_DIR" Default="\/data"/);
