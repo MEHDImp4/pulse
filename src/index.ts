@@ -7,6 +7,8 @@ import { handleQueuePagination } from "./interactions/queuePagination";
 import { handleSearchSelection } from "./interactions/searchSelection";
 import { env } from "./config/env";
 import { PlayerManager } from "./music/PlayerManager";
+import { PersonalLibrary } from "./music/PersonalLibrary";
+import { join } from "node:path";
 import { createProviderRegistry } from "./providers";
 import { YouTubeSuggestions } from "./services/suggestions";
 import { refreshNowPlaying, startNowPlayingUpdater } from "./services/nowPlaying";
@@ -31,7 +33,8 @@ const players = new PlayerManager(createProviderRegistry(), client);
 const suggestions = new YouTubeSuggestions(env.suggestTimeoutMs);
 // Bound per-user outbound suggestion lookups; Discord sends one request per keystroke.
 const autocompleteThrottle = createThrottle(300);
-const commandContext: CommandContext = { players, commands };
+const library = new PersonalLibrary(join(env.dataDir, "music-library.json"));
+const commandContext: CommandContext = { players, library, commands };
 
 void verifyExternalTools();
 

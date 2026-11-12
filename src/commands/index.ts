@@ -2,6 +2,10 @@ import { autoplay } from "./autoplay";
 import { clear } from "./clear";
 import { filter } from "./filter";
 import { forceskip } from "./forceskip";
+import { djrole } from "./djrole";
+import { fairqueue } from "./fairqueue";
+import { favorite } from "./favorite";
+import { myplaylist } from "./myplaylist";
 import { help } from "./help";
 import { leave } from "./leave";
 import { loop } from "./loop";
@@ -38,6 +42,10 @@ export const commands: CommandDefinition[] = [
   resume,
   skip,
   forceskip,
+  djrole,
+  fairqueue,
+  favorite,
+  myplaylist,
   previous,
   seek,
   stop,

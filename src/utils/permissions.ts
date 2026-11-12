@@ -1,7 +1,7 @@
 import { PermissionFlagsBits, type PermissionsBitField } from "discord.js";
 
 export const DJ_ONLY_MESSAGE =
-  "❌ Réservé aux modérateurs (permission « Gérer le serveur »).";
+  "❌ Réservé aux modérateurs ou à un rôle DJ autorisé.";
 
 /**
  * Whether a member may run the disruptive controls (skip, stop, seek, clear,
@@ -10,6 +10,9 @@ export const DJ_ONLY_MESSAGE =
  */
 export function canUseDjControls(
   permissions: Readonly<PermissionsBitField> | null | undefined,
+  memberRoles: readonly string[] = [],
+  djRoles: readonly string[] = [],
 ): boolean {
-  return Boolean(permissions?.has(PermissionFlagsBits.ManageGuild));
+  if (permissions?.has(PermissionFlagsBits.ManageGuild)) return true;
+  return memberRoles.some((roleId) => djRoles.includes(roleId));
 }

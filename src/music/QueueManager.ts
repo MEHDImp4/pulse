@@ -1,4 +1,5 @@
 import type { Track } from "./Track";
+import { fairQueueOrder } from "./fairQueue";
 
 export class QueueManager {
   private readonly tracks: Track[] = [];
@@ -28,6 +29,11 @@ export class QueueManager {
   removeAt(index: number): Track | undefined {
     if (!Number.isInteger(index) || index < 0 || index >= this.tracks.length) return undefined;
     return this.tracks.splice(index, 1)[0];
+  }
+
+  fairQueue(): void {
+    const ordered = fairQueueOrder(this.tracks);
+    this.tracks.splice(0, this.tracks.length, ...ordered);
   }
 
   shuffle(): void {

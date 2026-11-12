@@ -79,3 +79,23 @@ blocked by this lookup limiter.
   User-library playlists are not covered.
 - These services provide metadata only; Pulse resolves matching audio via
   the YouTube provider. Missing/region-blocked tracks are skipped.
+
+## Phase 3 — Personal libraries
+
+- `/favorite add`, `/favorite list`, `/favorite remove position`,
+  `/favorite play position`: favorites are private to each Discord user.
+- `/myplaylist save name`, `list`, `delete name`, `load name`:
+  save the current song and queue, reload by resolving sources at playback.
+- Personal music data is stored locally in `DATA_DIR/music-library.json` with
+  atomic file replacement, up to 100 favorites and 20 lists/100 tracks per
+  user. Back up `DATA_DIR` to retain this data.
+
+## Phase 3 — Community controls
+
+- `/djrole add|remove|list` lets a Manage Server administrator configure
+  up to ten DJ roles per guild. Roles are checked on disruptive slash
+  commands **and** playback buttons. Configuration persists in
+  `DATA_DIR/dj-roles.json`.
+- `/fairqueue` reorders the pending queue in round-robin requester order
+  while keeping each user's requested song order. This is a one-time
+  balancing action, not a persistent scheduling mode.

@@ -5,6 +5,7 @@ import type {
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import type { PlayerManager } from "../music/PlayerManager";
+import type { PersonalLibrary } from "../music/PersonalLibrary";
 
 export type SlashCommand =
   | SlashCommandBuilder
@@ -13,6 +14,7 @@ export type SlashCommand =
 
 export interface CommandContext {
   players: PlayerManager;
+  library: PersonalLibrary;
   commands: CommandDefinition[];
 }
 
