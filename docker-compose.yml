@@ -14,6 +14,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # Bootstrap requires these capabilities only to fix host AppData ownership
+    # and switch from root to the unprivileged node user.
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
     logging:
       driver: json-file
       options:

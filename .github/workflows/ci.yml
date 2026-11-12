@@ -38,3 +38,15 @@ jobs:
 
       - name: Build image
         run: docker build -t pulse-bot:ci .
+
+      - name: Unraid AppData first-run permission smoke test
+        run: |
+          mkdir -p "$RUNNER_TEMP/pulse-appdata"
+          chmod 755 "$RUNNER_TEMP/pulse-appdata"
+          docker run --rm \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --cap-add CHOWN --cap-add SETUID --cap-add SETGID \
+            -v "$RUNNER_TEMP/pulse-appdata:/data" \
+            pulse-bot:ci node -e "const fs=require('node:fs'); if(process.getuid() !== 1000) process.exit(2); fs.writeFileSync('/data/unraid-smoke.json','ok')"
+          test "$(cat "$RUNNER_TEMP/pulse-appdata/unraid-smoke.json")" = "ok"

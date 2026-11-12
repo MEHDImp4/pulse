@@ -4,11 +4,11 @@ Ce guide installe **Pulse avec une image Docker précompilée**. Il n'est pas
 nécessaire d'installer Node.js, TypeScript, Python, FFmpeg ni yt-dlp sur le
 serveur hôte.
 
-> **Publication :** l'image `ghcr.io/mehdimp4/pulse` deviendra disponible
-> après la fusion de la PR de distribution dans `master`, la réussite du
-> workflow [Publish Docker image](../.github/workflows/docker-publish.yml),
-> puis le passage en visibilité **publique** du package GHCR. Tant que ce n'est
-> pas fait, utiliser le *build local* décrit ci-dessous.
+> L'image `ghcr.io/mehdimp4/pulse:latest` est publiée par le workflow
+> [Publish Docker image](../.github/workflows/docker-publish.yml). Si elle
+> refuse le téléchargement anonyme, rendez le package public dans
+> **GitHub → Packages → pulse → Package settings → Change visibility**.
+> Le bot n'exige aucun port exposé, sauf si vous activez le dashboard.
 
 ## 1. Préparer l'application Discord
 
