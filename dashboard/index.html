@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0e111c">
+  <meta name="description" content="Pulse — Dashboard musical pour les serveurs Discord">
+  <title>Pulse — Your music, your server</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-symbol" aria-hidden="true">♫</span><span><strong>pulse<span class="accent">.</span></strong><small>CONTROL CENTER</small></span></div>
+      <div class="side-label">ESPACE DE TRAVAIL</div>
+      <nav class="nav"><div class="nav-active"><span aria-hidden="true">◈</span> Vue d’ensemble <span class="nav-tag">LIVE</span></div></nav>
+      <div class="side-label guild-heading">TES SERVEURS <span id="guild-count">0</span></div>
+      <div id="guilds" class="guild-list" aria-label="Serveurs accessibles"><div class="muted">Connexion requise</div></div>
+      <div class="sidebar-bottom">
+        <div class="online-dot"><span class="dot"></span> Console administrateur</div>
+        <button id="logout" class="logout" type="button" hidden>Se déconnecter</button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumb"><span>Workspace</span><span class="sep">/</span><strong id="current-server">Tableau de bord</strong></div>
+        <div class="top-right"><span class="tag">Discord Music Bot</span><span id="username" class="account">Invité</span></div>
+      </header>
+      <div class="page">
+        <div class="hero">
+          <div>
+            <div class="eyebrow"><span class="tiny-line"></span> TON ESPACE MUSICAL</div>
+            <h1>Bienvenue sur <em>Pulse.</em></h1>
+            <p>Prends le contrôle de ta musique, sans quitter Discord.</p>
+          </div>
+          <button id="refresh" class="button ghost" type="button">↻ Actualiser</button>
+        </div>
+        <section id="gate" class="gate panel">
+          <div class="gate-art" aria-hidden="true">♫</div>
+          <div class="eyebrow">ACCÈS SÉCURISÉ</div>
+          <h2>Connecte ton compte Discord</h2>
+          <p>Tu verras uniquement les serveurs où tu possèdes les droits de gestion et où Pulse est présent.</p>
+          <a class="button primary" href="/login">Se connecter avec Discord <span>↗</span></a>
+        </section>
+        <section id="workspace" hidden>
+          <div class="stat-grid">
+            <div class="stat panel"><div class="stat-label">ÉTAT DU LECTEUR</div><strong id="state" class="stat-value">—</strong><div id="state-caption" class="stat-footer">En attente</div></div>
+            <div class="stat panel"><div class="stat-label">FILE D'ATTENTE</div><strong id="queue-count" class="stat-value">0 <span>titres</span></strong><div class="stat-footer">Musiques programmées</div></div>
+            <div class="stat panel"><div class="stat-label">VOLUME</div><strong id="volume-stat" class="stat-value">—</strong><div class="stat-footer">Réglage du serveur</div></div>
+            <div class="stat panel"><div class="stat-label">LECTURES TOTALES</div><strong id="total-plays" class="stat-value">0</strong><div class="stat-footer">Sur ce serveur Discord</div></div>
+          </div>
+          <div class="content-grid">
+            <section class="player panel">
+              <div class="panel-head"><div><div class="eyebrow">LECTURE EN COURS</div><h2>Now Playing</h2></div><span id="play-pill" class="pill">HORS LIGNE</span></div>
+              <div class="artwork"><div class="art-shape art-shape-a"></div><div class="art-shape art-shape-b"></div><div class="art-note">♫</div></div>
+              <div class="song">
+                <h3 id="song-title">Aucune musique en cours</h3>
+                <p id="song-artist">Choisis un serveur dans la colonne de gauche</p>
+              </div>
+              <div class="timeline"><div class="timeline-track"><span></span></div><div class="time-row"><span>00:00</span><span id="duration">--:--</span></div></div>
+              <div class="controls">
+                <button class="control" type="button" data-action="skip" title="Morceau suivant" aria-label="Morceau suivant">⏭</button>
+                <button class="control primary-control" id="play-toggle" type="button" data-action="pause" title="Lecture / Pause" aria-label="Lecture / Pause">⏸</button>
+                <button class="control" type="button" data-action="stop" title="Arrêter" aria-label="Arrêter">■</button>
+              </div>
+              <div class="volume-row"><span aria-hidden="true">◖</span><label for="volume">Volume</label><input id="volume" type="range" min="0" max="100" step="5" value="50" aria-label="Volume"><strong id="volume-label">50%</strong></div>
+              <div class="player-footer"><span id="mode">Boucle désactivée</span><span id="filter">Filtre désactivé</span></div>
+            </section>
+            <section class="queue panel">
+              <div class="panel-head"><div><div class="eyebrow">PROCHAINEMENT</div><h2>File d'attente</h2></div><span id="queue-total" class="count">0 titres</span></div>
+              <form id="add-song" class="add-song" autocomplete="off"><label class="sr-only" for="song-query">Titre ou lien YouTube</label><input id="song-query" name="query" type="text" maxlength="200" placeholder="Rechercher un titre ou coller un lien…" required><button class="button primary" type="submit">+ Ajouter</button></form>
+              <div class="queue-meta"><span>GLISSE POUR RÉORGANISER</span><span>Durée</span></div>
+              <ol id="queue-items" class="queue-items"><li class="empty">La file d'attente est vide.</li></ol>
+              <div class="queue-footer">
+                <button id="fair" class="button ghost" data-action="fairqueue" type="button">⚖ Équilibrer</button>
+                <button class="button danger-soft" data-action="clear" type="button">Vider la file</button>
+              </div>
+            </section>
+          </div>
+          <section class="insights panel">
+            <div class="panel-head"><div><div class="eyebrow">TON SERVEUR</div><h2>Statistiques musicales</h2></div><span class="count">TOP 5</span></div>
+            <div class="insights-grid">
+              <div><h3>Titres les plus écoutés</h3><ol id="top-songs" class="top-list"><li class="empty">Pas encore de données.</li></ol></div>
+              <div><h3>Artistes populaires</h3><ol id="top-artists" class="top-list"><li class="empty">Pas encore de données.</li></ol></div>
+            </div>
+          </section>
+          <div class="below"><span><span class="dot"></span> Synchronisation toutes les 5 secondes</span><span id="uptime">Pulse v2 · Tableau de bord sécurisé</span></div>
+        </section>
+        <p id="notice" role="status" aria-live="polite"></p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

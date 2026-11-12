@@ -1,5 +1,6 @@
 import { generateDependencyReport } from "@discordjs/voice";
 import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
+import { startDashboard } from "./dashboard/server";
 import { commands, commandMap } from "./commands";
 import type { CommandContext } from "./commands/types";
 import { handleMusicControl } from "./interactions/musicControls";
@@ -30,6 +31,7 @@ const client = new Client({
 });
 
 const players = new PlayerManager(createProviderRegistry(), client);
+const dashboard = startDashboard(players, client);
 const suggestions = new YouTubeSuggestions(env.suggestTimeoutMs);
 // Bound per-user outbound suggestion lookups; Discord sends one request per keystroke.
 const autocompleteThrottle = createThrottle(300);
@@ -158,6 +160,7 @@ const shutdown = createShutdown({ client, players, logger });
 process.on("uncaughtException", (error) => {
   logger.fatal({ err: error }, "Uncaught exception");
   stopNowPlayingUpdater();
+  dashboard?.close();
   clearCooldowns();
   void shutdown("uncaughtException");
 });

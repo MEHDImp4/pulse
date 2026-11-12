@@ -1,0 +1,9 @@
+# Use with: docker compose -f docker-compose.yml -f dashboard/docker-compose.dashboard.yml up -d --build
+# In the Docker network the bot binds 0.0.0.0, but host exposure is loopback only.
+services:
+  bot:
+    environment:
+      DASHBOARD_PORT: "8080"
+      DASHBOARD_BIND: "0.0.0.0"
+    ports:
+      - "127.0.0.1:8080:8080"

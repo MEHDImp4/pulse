@@ -99,3 +99,45 @@ blocked by this lookup limiter.
 - `/fairqueue` reorders the pending queue in round-robin requester order
   while keeping each user's requested song order. This is a one-time
   balancing action, not a persistent scheduling mode.
+
+## Phase 4 — Web dashboard (OAuth Discord)
+
+Pulse includes an optional, responsive single-process web dashboard:
+- `/login` uses Discord OAuth2 Authorization Code with `identify guilds`.
+- Only Manage Server members, administrators and owners can inspect/control
+  their servers **where the bot is also installed**. Permissions are revalidated
+  on each API request.
+- Remote actions: pause, resume, skip, stop, set volume, remove/clear queue,
+  and fair-queue rotation. The dashboard is read-only if the bot has not joined
+  a voice channel.
+- Server-side OAuth tokens stay in memory; the browser only receives an
+  HttpOnly SameSite cookie and a separate CSRF token. Sessions disappear on
+  reboot or OAuth token expiry.
+
+Enable on the host:
+```env
+DASHBOARD_PORT=8080
+DASHBOARD_BIND=127.0.0.1
+DASHBOARD_PUBLIC_URL=https://pulse.example.com
+DASHBOARD_CLIENT_SECRET=your_discord_oauth_client_secret
+```
+Register the exact Discord OAuth2 redirect
+`https://pulse.example.com/oauth/callback` in the Discord developer portal.
+Place a TLS reverse proxy in front of the dashboard (for Docker, the optional
+`dashboard/docker-compose.dashboard.yml` exposes only 127.0.0.1:8080
+to the host; adjust networking to your reverse proxy).
+Never expose an HTTP dashboard publicly. CSRF and per-server guild access
+are enforced by the backend, not merely the frontend.
+
+The dashboard UI ships as static assets (no extra frontend dependencies)
+with a server-list sidebar, now-playing panel, volume control, drag-and-drop
+queue reordering, track search/addition, skip/stop, and Fair Queue.
+Remote actions are restricted to guild admins; the frontend is not a
+security boundary. A connected voice session is required to enqueue.
+
+## Listening insights and AutoDJ
+The dashboard shows per-server top 5 songs, artists, and total plays,
+saved in `DATA_DIR/listening-stats.json` (no listener IDs are stored).
+The AutoDJ candidate ranking prefers a similar duration/artist and
+penalizes karaoke, slowed and cover versions unless those keywords
+appear in the source track. Recommendations still contain randomness.
