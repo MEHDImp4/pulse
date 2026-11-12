@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Container version="2">
+  <Name>Pulse</Name>
+  <Repository>ghcr.io/mehdimp4/pulse:latest</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/MEHDImp4/pulse/issues</Support>
+  <Project>https://github.com/MEHDImp4/pulse</Project>
+  <Overview>Pulse : bot musical Discord avec YouTube, playlists, favoris, AutoDJ et dashboard OAuth2. Renseignez le token Discord et l'Application ID, puis démarrez. Les commandes slash se synchronisent au démarrage. Le dashboard reste désactivé tant que DASHBOARD_PORT=0. Configurez un reverse proxy HTTPS avant de l'activer.</Overview>
+  <Category>Tools: Productivity:</Category>
+  <WebUI></WebUI>
+  <Icon></Icon>
+  <ExtraParams>--init --security-opt=no-new-privileges --cap-drop=ALL</ExtraParams>
+  <PostArgs></PostArgs>
+  <CPUset></CPUset>
+  <DateInstalled></DateInstalled>
+  <DonateText></DonateText>
+  <DonateLink></DonateLink>
+  <Requires></Requires>
+  <Config Name="Pulse AppData" Target="/data" Default="/mnt/user/appdata/pulse" Mode="rw" Description="Dossier persistant : file, playlists, statistiques et roles DJ" Type="Path" Display="always" Required="true"/>
+  <Config Name="Discord Bot Token" Target="DISCORD_TOKEN" Default="" Mode="" Description="Discord Developer Portal, section Bot. Garder confidentiel." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Discord Application ID" Target="DISCORD_CLIENT_ID" Default="" Mode="" Description="Application ID / Client ID (nombre Discord)" Type="Variable" Display="always" Required="true"/>
+  <Config Name="Enregistrer les commandes" Target="PULSE_DEPLOY_COMMANDS_ON_START" Default="true" Mode="" Description="true : synchronise automatiquement les slash commands au demarrage" Type="Variable" Display="always" Required="false"/>
+  <Config Name="Discord Guild ID" Target="DISCORD_GUILD_ID" Default="" Mode="" Description="Optionnel : publication rapide des commandes dans un seul serveur pour tester" Type="Variable" Display="advanced" Required="false"/>
+  <Config Name="Dashboard actif (0 = desactive)" Target="DASHBOARD_PORT" Default="0" Mode="" Description="Mettre 8080 apres configuration HTTPS et OAuth2" Type="Variable" Display="advanced" Required="false"/>
+  <Config Name="Dashboard Bind" Target="DASHBOARD_BIND" Default="0.0.0.0" Mode="" Description="Ecoute dans le conteneur sur le port 8080 lorsque le dashboard est actif" Type="Variable" Display="advanced" Required="false"/>
+  <Config Name="Dashboard Port" Target="8080" Default="8080" Mode="tcp" Description="A proteger avec un reverse proxy HTTPS. Ne pas exposer ce port sur Internet." Type="Port" Display="advanced" Required="false"/>
+  <Config Name="URL HTTPS du dashboard" Target="DASHBOARD_PUBLIC_URL" Default="" Mode="" Description="ex : https://pulse.example.com. Ajouter le callback OAuth2 correspondant dans Discord" Type="Variable" Display="advanced" Required="false"/>
+  <Config Name="OAuth Discord Client Secret" Target="DASHBOARD_CLIENT_SECRET" Default="" Mode="" Description="OAuth2 Client Secret (different du token bot)" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Spotify Client ID" Target="SPOTIFY_CLIENT_ID" Default="" Mode="" Description="Optionnel : metadonnees Spotify" Type="Variable" Display="advanced" Required="false"/>
+  <Config Name="Spotify Client Secret" Target="SPOTIFY_CLIENT_SECRET" Default="" Mode="" Description="Optionnel : Spotify" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Spotify Refresh Token" Target="SPOTIFY_REFRESH_TOKEN" Default="" Mode="" Description="Optionnel : playlists Spotify autorisees" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Apple Music Developer Token" Target="APPLE_MUSIC_DEVELOPER_TOKEN" Default="" Mode="" Description="Optionnel : playlists Apple Music catalogue" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Mise a jour yt-dlp au demarrage" Target="YTDLP_AUTO_UPDATE" Default="false" Mode="" Description="Desactivee : preferer mettre a jour l'image Docker" Type="Variable" Display="advanced" Required="false"/>
+</Container>

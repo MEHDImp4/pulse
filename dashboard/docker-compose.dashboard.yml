@@ -1,9 +1,10 @@
-# Use with: docker compose -f docker-compose.yml -f dashboard/docker-compose.dashboard.yml up -d --build
-# In the Docker network the bot binds 0.0.0.0, but host exposure is loopback only.
+# Optional HTTPS reverse-proxy configuration:
+# docker compose -f docker-compose.yml -f dashboard/docker-compose.dashboard.yml up -d
+# The host mapping is loopback-only. Route a reverse proxy with TLS to this port.
 services:
   bot:
     environment:
       DASHBOARD_PORT: "8080"
       DASHBOARD_BIND: "0.0.0.0"
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${DASHBOARD_HOST_PORT:-8080}:8080"
