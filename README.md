@@ -1,22 +1,26 @@
-<div align="center">
+<h1 align="center">Pulse</h1>
 
-# Pulse
+<p align="center"><strong>Your music. Your server. Your rules.</strong></p>
 
-**Your music. Your server. Your rules.**
+<p align="center">A self-hosted Discord music bot with interactive playback, personal playlists, community controls, and an optional web dashboard.</p>
 
-A self-hosted Discord music bot with interactive playback, personal playlists, community controls, and an optional web dashboard.
+<p align="center"><strong>TypeScript · discord.js · yt-dlp · FFmpeg</strong></p>
 
-Built with **TypeScript · discord.js · yt-dlp · FFmpeg**
+<p align="center">
+  <a href="https://github.com/MEHDImp4/pulse/actions/workflows/ci.yml"><img src="https://github.com/MEHDImp4/pulse/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI" /></a>
+  <a href="https://github.com/MEHDImp4/pulse/actions/workflows/codeql.yml"><img src="https://github.com/MEHDImp4/pulse/actions/workflows/codeql.yml/badge.svg?branch=master" alt="CodeQL" /></a>
+  <a href="https://github.com/MEHDImp4/pulse/actions/workflows/docker-publish.yml"><img src="https://github.com/MEHDImp4/pulse/actions/workflows/docker-publish.yml/badge.svg?branch=master" alt="Docker publish" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8A73FF.svg" alt="MIT License" /></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-24%2B-377F55.svg" alt="Node.js 24+" /></a>
+</p>
 
-[![CI](https://github.com/MEHDImp4/pulse/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/MEHDImp4/pulse/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/MEHDImp4/pulse/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/MEHDImp4/pulse/actions/workflows/codeql.yml)
-[![Docker](https://github.com/MEHDImp4/pulse/actions/workflows/docker-publish.yml/badge.svg?branch=master)](https://github.com/MEHDImp4/pulse/actions/workflows/docker-publish.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-8A73FF.svg)](LICENSE)
-[![Node.js 24+](https://img.shields.io/badge/Node.js-24%2B-377F55.svg)](https://nodejs.org/)
-
-[**Get started**](#quick-start) · [**Unraid**](#unraid) · [**Commands**](#discord-commands) · [**Web dashboard**](#optional-web-dashboard) · [**Français**](README.fr.md)
-
-</div>
+<p align="center">
+  <a href="#quick-start">Get started</a> ·
+  <a href="#unraid">Unraid</a> ·
+  <a href="#discord-commands">Commands</a> ·
+  <a href="#optional-web-dashboard">Web dashboard</a> ·
+  <a href="README.fr.md">Français</a>
+</p>
 
 ---
 
@@ -265,10 +269,6 @@ CI runs TypeScript checks, tests and Docker builds. Security analysis uses CodeQ
 
 Pulse is open source under the [MIT License](LICENSE). It is not affiliated with Discord, YouTube, Spotify, Deezer, Apple Music or SoundCloud. Use music sources in accordance with their terms and applicable law.
 
-<div align="center">
+<p align="center"><strong>Built for shared listening. Hosted by you.</strong></p>
 
-**Built for shared listening. Hosted by you.**
-
-[Back to top](#pulse) · [Documentation en français](README.fr.md)
-
-</div>
+<p align="center"><a href="#pulse">Back to top</a> · <a href="README.fr.md">Documentation en français</a></p>
