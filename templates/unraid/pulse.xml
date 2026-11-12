@@ -1,36 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Container version="2">
-  <Name>Pulse</Name>
+  <Name>Pulse-Discord-Music</Name>
   <Repository>ghcr.io/mehdimp4/pulse:latest</Repository>
-  <Registry>https://ghcr.io</Registry>
+  <Registry>https://github.com/users/MEHDImp4/packages/container/package/pulse</Registry>
   <Network>bridge</Network>
+  <Shell>sh</Shell>
   <Privileged>false</Privileged>
   <Support>https://github.com/MEHDImp4/pulse/issues</Support>
   <Project>https://github.com/MEHDImp4/pulse</Project>
-  <Overview>Pulse : bot musical Discord avec YouTube, playlists, favoris, AutoDJ et dashboard OAuth2. Renseignez le token Discord et l'Application ID, puis démarrez. Les commandes slash se synchronisent au démarrage. Le dashboard reste désactivé tant que DASHBOARD_PORT=0. Configurez un reverse proxy HTTPS avant de l'activer.</Overview>
-  <Category>Tools: Productivity:</Category>
+  <TemplateURL>https://raw.githubusercontent.com/MEHDImp4/pulse/master/templates/unraid/pulse.xml</TemplateURL>
+  <ReadMe>https://raw.githubusercontent.com/MEHDImp4/pulse/master/docs/DOCKER_INSTALL.md</ReadMe>
+  <Overview>Pulse Discord Music est un bot musical auto-heberge pour Discord. Lecture YouTube, playlists, favoris, AutoDJ, controles DJ et tableau de bord OAuth facultatif. Installez-le sur Unraid en renseignant le token du bot et son Application ID. Aucune base de donnees externe n'est necessaire.</Overview>
+  <Description>Bot Discord musical prive, auto-heberge et facile a configurer. Les commandes slash sont enregistrees automatiquement. Les fichiers persistants sont enregistres dans AppData. Le dashboard est desactive par defaut et doit utiliser OAuth Discord et un reverse proxy HTTPS s'il est active.</Description>
+  <Category>Tools:Utilities</Category>
+  <ExtraSearchTerms>Discord music bot audio player YouTube playlists radio autoDJ</ExtraSearchTerms>
+  <License>MIT</License>
   <WebUI></WebUI>
-  <Icon></Icon>
-  <ExtraParams>--init --security-opt=no-new-privileges --cap-drop=ALL</ExtraParams>
-  <PostArgs></PostArgs>
-  <CPUset></CPUset>
-  <DateInstalled></DateInstalled>
-  <DonateText></DonateText>
-  <DonateLink></DonateLink>
-  <Requires></Requires>
-  <Config Name="Pulse AppData" Target="/data" Default="/mnt/user/appdata/pulse" Mode="rw" Description="Dossier persistant : file, playlists, statistiques et roles DJ" Type="Path" Display="always" Required="true"/>
-  <Config Name="Discord Bot Token" Target="DISCORD_TOKEN" Default="" Mode="" Description="Discord Developer Portal, section Bot. Garder confidentiel." Type="Variable" Display="always" Required="true" Mask="true"/>
-  <Config Name="Discord Application ID" Target="DISCORD_CLIENT_ID" Default="" Mode="" Description="Application ID / Client ID (nombre Discord)" Type="Variable" Display="always" Required="true"/>
-  <Config Name="Enregistrer les commandes" Target="PULSE_DEPLOY_COMMANDS_ON_START" Default="true" Mode="" Description="true : synchronise automatiquement les slash commands au demarrage" Type="Variable" Display="always" Required="false"/>
-  <Config Name="Discord Guild ID" Target="DISCORD_GUILD_ID" Default="" Mode="" Description="Optionnel : publication rapide des commandes dans un seul serveur pour tester" Type="Variable" Display="advanced" Required="false"/>
-  <Config Name="Dashboard actif (0 = desactive)" Target="DASHBOARD_PORT" Default="0" Mode="" Description="Mettre 8080 apres configuration HTTPS et OAuth2" Type="Variable" Display="advanced" Required="false"/>
-  <Config Name="Dashboard Bind" Target="DASHBOARD_BIND" Default="0.0.0.0" Mode="" Description="Ecoute dans le conteneur sur le port 8080 lorsque le dashboard est actif" Type="Variable" Display="advanced" Required="false"/>
-  <Config Name="Dashboard Port" Target="8080" Default="8080" Mode="tcp" Description="A proteger avec un reverse proxy HTTPS. Ne pas exposer ce port sur Internet." Type="Port" Display="advanced" Required="false"/>
-  <Config Name="URL HTTPS du dashboard" Target="DASHBOARD_PUBLIC_URL" Default="" Mode="" Description="ex : https://pulse.example.com. Ajouter le callback OAuth2 correspondant dans Discord" Type="Variable" Display="advanced" Required="false"/>
-  <Config Name="OAuth Discord Client Secret" Target="DASHBOARD_CLIENT_SECRET" Default="" Mode="" Description="OAuth2 Client Secret (different du token bot)" Type="Variable" Display="advanced" Required="false" Mask="true"/>
-  <Config Name="Spotify Client ID" Target="SPOTIFY_CLIENT_ID" Default="" Mode="" Description="Optionnel : metadonnees Spotify" Type="Variable" Display="advanced" Required="false"/>
-  <Config Name="Spotify Client Secret" Target="SPOTIFY_CLIENT_SECRET" Default="" Mode="" Description="Optionnel : Spotify" Type="Variable" Display="advanced" Required="false" Mask="true"/>
-  <Config Name="Spotify Refresh Token" Target="SPOTIFY_REFRESH_TOKEN" Default="" Mode="" Description="Optionnel : playlists Spotify autorisees" Type="Variable" Display="advanced" Required="false" Mask="true"/>
-  <Config Name="Apple Music Developer Token" Target="APPLE_MUSIC_DEVELOPER_TOKEN" Default="" Mode="" Description="Optionnel : playlists Apple Music catalogue" Type="Variable" Display="advanced" Required="false" Mask="true"/>
-  <Config Name="Mise a jour yt-dlp au demarrage" Target="YTDLP_AUTO_UPDATE" Default="false" Mode="" Description="Desactivee : preferer mettre a jour l'image Docker" Type="Variable" Display="advanced" Required="false"/>
+  <ExtraParams>--init --security-opt=no-new-privileges --cap-drop=ALL --cap-add=CHOWN --cap-add=SETUID --cap-add=SETGID</ExtraParams>
+  <Requires>Connexion internet sortante pour Discord, YouTube, yt-dlp et API musicales. Pas de GPU.</Requires>
+  <Config Name="AppData - Pulse" Target="/data" Default="/mnt/user/appdata/pulse-discord-music" Mode="rw" Description="Stockage permanent : playlists, preferences, files d'attente et statistiques" Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Discord Bot Token" Target="DISCORD_TOKEN" Default="" Mode="" Description="Token secret de votre Bot dans Discord Developer Portal" Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Discord Application ID" Target="DISCORD_CLIENT_ID" Default="" Mode="" Description="Application ID (nombre Discord) dans General Information" Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Enregistrer les slash commands" Target="PULSE_DEPLOY_COMMANDS_ON_START" Default="true" Mode="" Description="Enregistre ou actualise automatiquement les slash commands a chaque demarrage" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Discord Guild ID (facultatif)" Target="DISCORD_GUILD_ID" Default="" Mode="" Description="Serveur de test : commandes immediates ; laisser vide pour commandes globales" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Data directory" Target="DATA_DIR" Default="/data" Mode="" Description="Repertoire interne du volume persistant ; conserver /data" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Dashboard HTTP internal port" Target="DASHBOARD_PORT" Default="0" Mode="" Description="0 = desactive. Pour activer, utiliser 8080 et configurer l'URL HTTPS ainsi que l'OAuth Discord" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Dashboard listen address" Target="DASHBOARD_BIND" Default="0.0.0.0" Mode="" Description="Adresse interne. Ne pas publier le port HTTP sur Internet, utiliser un proxy HTTPS" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Dashboard public HTTPS URL" Target="DASHBOARD_PUBLIC_URL" Default="" Mode="" Description="URL HTTPS, par exemple https://pulse.example.com" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Discord OAuth Client Secret" Target="DASHBOARD_CLIENT_SECRET" Default="" Mode="" Description="Secret OAuth2 Discord pour le dashboard, ne pas confondre avec le token du bot" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Spotify Client ID" Target="SPOTIFY_CLIENT_ID" Default="" Mode="" Description="Optionnel : informations des titres Spotify" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Spotify Client Secret" Target="SPOTIFY_CLIENT_SECRET" Default="" Mode="" Description="Optionnel : identifiant secret de l'API Spotify" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Spotify OAuth Refresh Token" Target="SPOTIFY_REFRESH_TOKEN" Default="" Mode="" Description="Optionnel : playlists accessibles au compte Spotify OAuth" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Apple Music Developer Token" Target="APPLE_MUSIC_DEVELOPER_TOKEN" Default="" Mode="" Description="Optionnel : token de l'API du catalogue Apple Music" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="yt-dlp auto-update" Target="YTDLP_AUTO_UPDATE" Default="false" Mode="" Description="Laisser false : mettre a jour l'image Docker pour des versions testees" Type="Variable" Display="advanced" Required="false" Mask="false"/>
 </Container>

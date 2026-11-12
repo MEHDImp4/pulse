@@ -36,7 +36,7 @@ LABEL org.opencontainers.image.source="https://github.com/MEHDImp4/pulse" \
       org.opencontainers.image.licenses="MIT"
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg python3 ca-certificates procps \
+    && apt-get install -y --no-install-recommends ffmpeg python3 ca-certificates procps gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # yt-dlp venv (writable by the runtime user for self-update).
@@ -58,12 +58,12 @@ RUN mkdir -p /data && chown node:node /data
 COPY --chown=node:node docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-ENV NODE_ENV=production
+ENV NODE_ENV=production DATA_DIR=/data
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD pgrep -f "node dist/index.js" > /dev/null || exit 1
 
-USER node
-
+# Start as root only to normalize ownership of Unraid's bind-mounted appdata.
+# The entrypoint immediately drops privileges to node via gosu.
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]

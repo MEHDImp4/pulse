@@ -1,6 +1,24 @@
 #!/bin/sh
 set -eu
 
+# Unraid's Docker UI creates host bind-mount folders as root:root (0755).
+# The bot runs as unprivileged node and needs to persist to /data.
+# Run only this small bootstrap as root, then drop privileges permanently.
+if [ "$(id -u)" = "0" ]; then
+  dir="${DATA_DIR:-/data}"
+  case "$dir" in
+    /data|/data/*) ;;
+    *) echo "[pulse] Refusing root bootstrap outside /data" >&2; exit 64 ;;
+  esac
+  if [ ! -d "$dir" ]; then
+    echo "[pulse] Persistent data directory does not exist: $dir" >&2
+    exit 64
+  fi
+  chown -R node:node "$dir"
+  exec gosu node "$0" "$@"
+fi
+
+
 # Only register slash commands when starting the bot, never when running
 # an explicit utility command (for instance, docker compose run bot ...).
 if [ "${1:-}" = "node" ] && [ "${2:-}" = "dist/index.js" ]; then
