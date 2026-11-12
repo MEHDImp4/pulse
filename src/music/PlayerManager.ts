@@ -348,6 +348,16 @@ export class PlayerManager {
     return { title: result.title, tracks };
   }
 
+  async searchChoices(input: string, requestedBy: RequestedBy, limit = 5): Promise<Track[]> {
+    const query = input.trim();
+    if (!query) return [];
+    const candidates = this.provider.searchChoices
+      ? await this.provider.searchChoices(query, requestedBy, limit)
+      : [await this.provider.search(query, requestedBy)];
+    const maxSeconds = env.maxTrackDurationMinutes * 60;
+    return candidates.filter((t) => maxSeconds <= 0 || t.duration === undefined || t.duration <= maxSeconds);
+  }
+
   async resolveTrack(input: string, requestedBy: RequestedBy): Promise<Track> {
     const trimmed = input.trim();
     const track = /^https?:\/\//i.test(trimmed)

@@ -63,3 +63,19 @@ blocked by this lookup limiter.
 - `METADATA_CACHE_TTL_MS=600000` and `METADATA_CACHE_MAX_ENTRIES=500`
   bound the reusable metadata cache. Playlist/search cache entries are limited
   to 5 minutes and at most 100 entries per provider.
+
+## Phase 2 — Interactive music and playlists
+
+- `/search query:<title>` returns up to five tracks in a private select menu.
+  Only the requester can pick a result, from the original voice channel,
+  within 2 minutes. `/play` stays instant for users who prefer one command.
+- `/playlist` accepts YouTube and Deezer public playlists.
+- Spotify playlist import requires `SPOTIFY_CLIENT_ID`,
+  `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REFRESH_TOKEN`. Spotify's
+  2026 API restricts `/playlists/{id}/items` to playlists owned by or
+  shared with the OAuth account. Arbitrary public playlists **will not work**.
+- Apple Music catalog playlists require a developer JWT in
+  `APPLE_MUSIC_DEVELOPER_TOKEN` and optionally `APPLE_MUSIC_STOREFRONT`.
+  User-library playlists are not covered.
+- These services provide metadata only; Pulse resolves matching audio via
+  the YouTube provider. Missing/region-blocked tracks are skipped.

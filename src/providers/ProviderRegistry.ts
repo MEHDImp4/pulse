@@ -37,6 +37,12 @@ export class ProviderRegistry implements AudioProvider {
     return this.fallback.search(query, requestedBy);
   }
 
+  async searchChoices(query: string, requestedBy: RequestedBy, limit: number): Promise<Track[]> {
+    return this.fallback.searchChoices
+      ? this.fallback.searchChoices(query, requestedBy, limit)
+      : [await this.fallback.search(query, requestedBy)];
+  }
+
   async resolve(url: string, requestedBy: RequestedBy): Promise<Track> {
     const provider = this.find(url) ?? this.fallback;
     return provider.resolve(url, requestedBy);

@@ -16,6 +16,7 @@ import { queue } from "./queue";
 import { remove } from "./remove";
 import { resume } from "./resume";
 import { seek } from "./seek";
+import { search } from "./search";
 import { shuffle } from "./shuffle";
 import { skip } from "./skip";
 import { status } from "./status";
@@ -29,6 +30,7 @@ export type { CommandContext, CommandDefinition } from "./types";
 
 export const commands: CommandDefinition[] = [
   play,
+  search,
   playnext,
   playlist,
   testaudio,

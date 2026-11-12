@@ -7,11 +7,11 @@ import type { CommandDefinition } from "./types";
 export const playlist: CommandDefinition = {
   data: new SlashCommandBuilder()
     .setName("playlist")
-    .setDescription("Ajoute une playlist YouTube à la file d'attente")
+    .setDescription("Importe une playlist musicale")
     .addStringOption((option) =>
       option
         .setName("url")
-        .setDescription("URL de la playlist YouTube")
+        .setDescription("URL YouTube, Spotify, Deezer ou Apple Music")
         .setRequired(true),
     )
     .addIntegerOption((option) =>
