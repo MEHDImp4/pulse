@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CommunityApplications>
   <Profile>Pulse Discord Music est un bot musical Discord auto-heberge. Ce depot fournit son image Docker et son template Unraid (sans GPU), pour une installation depuis le gestionnaire Docker d'Unraid. Pour demander de l'aide, consulter les issues du projet : https://github.com/MEHDImp4/pulse/issues. L'application est distincte du produit homonyme de monitoring Pulse.</Profile>
+  <Icon>https://raw.githubusercontent.com/MEHDImp4/pulse/master/assets/pulse-icon.png</Icon>
   <WebPage>https://github.com/MEHDImp4/pulse</WebPage>
 </CommunityApplications>

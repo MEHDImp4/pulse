@@ -8,6 +8,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/MEHDImp4/pulse/issues</Support>
   <Project>https://github.com/MEHDImp4/pulse</Project>
+  <Icon>https://raw.githubusercontent.com/MEHDImp4/pulse/master/assets/pulse-icon.png</Icon>
   <TemplateURL>https://raw.githubusercontent.com/MEHDImp4/pulse/master/templates/unraid/pulse.xml</TemplateURL>
   <ReadMe>https://raw.githubusercontent.com/MEHDImp4/pulse/master/docs/DOCKER_INSTALL.md</ReadMe>
   <Overview>Pulse Discord Music est un bot musical auto-heberge pour Discord. Lecture YouTube, playlists, favoris, AutoDJ, controles DJ et tableau de bord OAuth facultatif. Installez-le sur Unraid en renseignant le token du bot et son Application ID. Aucune base de donnees externe n'est necessaire.</Overview>
