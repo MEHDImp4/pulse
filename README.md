@@ -1,156 +1,274 @@
-# Pulse — Discord Music Bot
+<h1 align="center">Pulse</h1>
 
-Per-server music queues, interactive playback controls, live progress, and reliable streaming through `yt-dlp` and FFmpeg. Built with TypeScript and discord.js, with Docker support.
+<p align="center"><strong>Your music. Your server. Your rules.</strong></p>
 
-## Highlights
+<p align="center">A self-hosted Discord music bot with interactive playback, personal playlists, community controls, and an optional web dashboard.</p>
 
-- YouTube search and playlists, SoundCloud streams, radio URLs, and supported music-link resolution
-- Independent queues and playback settings for each Discord server
-- Slash commands, button controls, vote-skip, filters, lyrics, and autoplay
-- Queue persistence, status reporting, and Docker deployment
+<p align="center"><strong>TypeScript · discord.js · yt-dlp · FFmpeg</strong></p>
+
+<p align="center">
+  <a href="https://github.com/MEHDImp4/pulse/actions/workflows/ci.yml"><img src="https://github.com/MEHDImp4/pulse/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI" /></a>
+  <a href="https://github.com/MEHDImp4/pulse/actions/workflows/codeql.yml"><img src="https://github.com/MEHDImp4/pulse/actions/workflows/codeql.yml/badge.svg?branch=master" alt="CodeQL" /></a>
+  <a href="https://github.com/MEHDImp4/pulse/actions/workflows/docker-publish.yml"><img src="https://github.com/MEHDImp4/pulse/actions/workflows/docker-publish.yml/badge.svg?branch=master" alt="Docker publish" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8A73FF.svg" alt="MIT License" /></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-24%2B-377F55.svg" alt="Node.js 24+" /></a>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Get started</a> ·
+  <a href="#unraid">Unraid</a> ·
+  <a href="#discord-commands">Commands</a> ·
+  <a href="#optional-web-dashboard">Web dashboard</a> ·
+  <a href="README.fr.md">Français</a>
+</p>
+
+---
+
+## Why Pulse?
+
+Pulse brings music into your Discord voice channels without handing control to a third-party hosted bot. Run it on **Unraid, Docker, a VPS, or your own computer**. Each Discord server gets its own playback sessions and queue, while the music library and settings persist across restarts.
+
+| Music | Community | Self-hosting |
+|:--|:--|:--|
+| YouTube search, links and playlists | Personal favorites and saved playlists | Ready-to-use Docker image |
+| SoundCloud and supported public radio streams | Configurable DJ roles and vote-skip | Unraid template with persistent AppData |
+| Spotify, Deezer and Apple Music link resolution¹ | Fair Queue and interactive controls | Automatic slash-command registration |
+| Autoplay, audio filters and lyrics | Independent server queues | Optional Discord OAuth2 web dashboard |
+
+¹ **Important:** Spotify, Deezer and Apple Music are metadata/link providers, **not direct premium-audio streaming sources**. Pulse searches for corresponding playable tracks through its supported audio providers. Spotify playlist import requires access to a playlist owned by or shared with the OAuth account; Apple Music catalog playlist import requires a developer token. Availability can vary by source and region.
 
 ## Quick start
 
-Requirements: Node.js 24+, FFmpeg, yt-dlp, and a Discord application with a bot token.
+### 1. Create a Discord application
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications), create an application and configure its **Bot**.
+2. Copy the **Bot Token** and the **Application ID** (also called Client ID).
+3. Invite the bot to your server with the `bot` and `applications.commands` scopes. Give it the permissions needed for **View Channels**, **Connect**, **Speak**, **Send Messages** and **Embed Links**.
+4. Optionally copy your **Discord Guild ID** to register commands immediately in one test server.
+
+> **Keep your Bot Token private.** Never commit it, paste it into an issue, or include it in a screenshot. If exposed, regenerate it in the Discord Developer Portal.
+
+### 2. Choose your installation method
+
+| Platform | Best for | Installation |
+|---|---|---|
+| **Unraid** | Homelabs and NAS servers | [Open the Unraid instructions](#unraid) |
+| **Docker Compose** | Linux, VPS and other Docker hosts | [Use the prebuilt image](#docker-compose) |
+| **Node.js** | Development and contributors | [Run from source](#run-from-source) |
+
+### Unraid
+
+**No Node.js, FFmpeg or Docker Compose setup is required on the Unraid host.** Pulse has a native [Unraid Docker template](templates/unraid/pulse.xml) named **Pulse-Discord-Music**.
+
+Until the application is approved for Unraid **Community Applications**, install its template once from the Unraid terminal:
 
 ```sh
-npm install
+mkdir -p /boot/config/plugins/dockerMan/templates-user
+wget -q -O /boot/config/plugins/dockerMan/templates-user/my-pulse-discord-music.xml \
+  https://raw.githubusercontent.com/MEHDImp4/pulse/master/templates/unraid/pulse.xml
+```
+
+Then open **Unraid → Docker → Add Container → Template → Pulse-Discord-Music** and fill in:
+
+| Field | Value |
+|---|---|
+| **Discord Bot Token** | Your secret bot token |
+| **Discord Application ID** | Your application's numeric ID |
+| AppData | `/mnt/user/appdata/pulse-discord-music` (default) |
+| Dashboard | Disabled by default; optional |
+
+Select **Apply**. Pulse downloads its container image, persists its configuration under `/data`, and registers slash commands on startup.
+
+**Community Applications status:** the repository contains the template and `ca_profile.xml`, but this **does not mean** Pulse is already listed in the public Unraid Apps catalog. Submission and approval are separate steps. See the [complete Unraid guide](docs/DOCKER_INSTALL.md#4-installation-native-unraid-sans-docker-compose).
+
+> The image is hosted at `ghcr.io/mehdimp4/pulse:latest`. A successful GitHub Actions publish does not by itself guarantee anonymous downloads: the GHCR package must also be set to **Public**. See [Troubleshooting](#troubleshooting).
+
+### Docker Compose
+
+Requires Docker Engine, Docker Compose v2 and Git. The regular installation **pulls a prebuilt image**; it does not compile the source.
+
+```sh
+git clone https://github.com/MEHDImp4/pulse.git
+cd pulse
+
+# Interactive setup: Discord credentials and optional dashboard
+sh scripts/docker-setup.sh
+
+docker compose pull
+docker compose up -d
+docker compose logs -f bot
+```
+
+The setup wizard saves credentials to `.env.docker` with restricted file permissions. Music and settings survive container recreation in the `pulse-data` Docker volume.
+
+**Update Pulse:**
+
+```sh
+docker compose pull
+docker compose up -d
+```
+
+Need a local development build instead? See [the Docker install guide](docs/DOCKER_INSTALL.md).
+
+### Run from source
+
+Requires **Node.js 24.17+**, **FFmpeg**, **yt-dlp** and a Discord application.
+
+```sh
+git clone https://github.com/MEHDImp4/pulse.git
+cd pulse
+npm ci
 cp .env.example .env
+
+# Set DISCORD_TOKEN and DISCORD_CLIENT_ID in .env
 npm run deploy:commands
 npm run dev
 ```
 
-Set `DISCORD_TOKEN` and `DISCORD_CLIENT_ID` in `.env`. Add `DISCORD_GUILD_ID` for development commands scoped to one server.
+Set `DISCORD_GUILD_ID` if you want slash commands registered only in your test server. Use `npm run build` and `npm start` for a compiled local run.
 
-**Docker / Unraid (no build required):** See [docs/DOCKER_INSTALL.md](./docs/DOCKER_INSTALL.md) for an image-based install with a guided credential setup, a Compose template, optional OAuth dashboard and Unraid configuration.
+## Discord commands
 
-```sh
-sh scripts/docker-setup.sh
-docker compose up -d
+Join a voice channel first, then try `/play`. Most actions work as native Discord slash commands; you do not need to memorize text prefixes.
+
+| Command | What it does |
+|---|---|
+| `/play query:<title or URL>` | Search or queue a track; also recognizes supported playlists |
+| `/search query:<title>` | Pick from up to five results using a private Discord menu |
+| `/playlist url:<URL> [limit:<n>]` | Import a supported playlist |
+| `/queue`, `/nowplaying` | See what is queued and currently playing |
+| `/pause`, `/resume`, `/skip`, `/stop` | Playback controls |
+| `/playnext`, `/previous`, `/remove`, `/shuffle`, `/clear` | Manage the queue |
+| `/loop`, `/autoplay`, `/filter`, `/volume`, `/seek` | Customize playback |
+| `/favorite add`, `/favorite list`, `/favorite play` | Your personal favorites |
+| `/myplaylist save`, `/myplaylist list`, `/myplaylist load` | Save and replay your own playlists |
+| `/djrole add`, `/djrole remove`, `/djrole list` | Configure DJ roles (Manage Server required) |
+| `/fairqueue` | Rotate queued requests fairly between users |
+| `/voteskip` | Vote to skip a track |
+| `/lyrics` | Look up lyrics when available |
+| `/status`, `/testaudio`, `/help`, `/leave` | Diagnostics, help and voice management |
+
+For a complete list of options, use **`/help` in Discord**. A configured DJ role or the **Manage Server** permission is required for certain disruptive queue/playback controls. `/fairqueue` rearranges the existing queue **once**; it is not a continuously enabled scheduling mode.
+
+> The search menu is bound to the requesting user and voice channel and expires after two minutes. Your favorites and personal playlists are stored separately for each Discord user.
+
+## Optional web dashboard
+
+Pulse includes a responsive browser dashboard for managing playback, the queue and listening statistics.
+
+- Sign in with **Discord OAuth2**; no bot token is sent to your browser.
+- View only servers where you have **Manage Server** / administrator permissions and Pulse is installed.
+- Pause, resume, skip, stop, change volume, add tracks, clear or reorder the queue using drag-and-drop.
+- View each server's most-played songs, popular artists and playback counts.
+
+The dashboard is **disabled by default**. To enable it with Docker Compose:
+
+1. Add these settings to `.env.docker` (replace the example values):
+
+   ```dotenv
+   DASHBOARD_PORT=8080
+   DASHBOARD_PUBLIC_URL=https://pulse.example.com
+   DASHBOARD_CLIENT_SECRET=YOUR_DISCORD_OAUTH_CLIENT_SECRET
+   ```
+
+2. Register the exact redirect URI `https://pulse.example.com/oauth/callback` in **Discord Developer Portal → OAuth2 → Redirects**.
+3. Run the optional dashboard Compose overlay:
+
+   ```sh
+   docker compose -f docker-compose.yml \
+     -f dashboard/docker-compose.dashboard.yml up -d
+   ```
+
+4. Configure a **TLS/HTTPS reverse proxy** in front of the dashboard. The Compose overlay publishes the port only to `127.0.0.1` on the Docker host; a proxy running in another container needs appropriate shared networking.
+
+**Never publish the dashboard's HTTP port directly to the internet.** On Unraid, follow the [dashboard-specific instructions](docs/DOCKER_INSTALL.md#dashboard-sur-unraid). The dashboard controls an **existing connected voice session**; starting a new voice connection still happens through Discord.
+
+## Configuration
+
+Only two credentials are required: `DISCORD_TOKEN` and `DISCORD_CLIENT_ID`. Everything else is optional.
+
+| Environment variable | Default | Purpose |
+|---|---|---|
+| `DISCORD_GUILD_ID` | Empty | Register slash commands in one Discord server (instead of globally) |
+| `DATA_DIR` | `/data` in Docker | Persistent queues, personal playlists, DJ roles and statistics |
+| `MAX_QUEUE_SIZE` | `100` | Maximum pending tracks |
+| `PLAYLIST_MAX_ITEMS` | `50` | Tracks imported per playlist |
+| `AUTOPLAY_DEFAULT` | `true` | Automatically suggest related tracks |
+| `QUEUE_PERSIST` | `true` | Save and resume queues across restarts |
+| `NOWPLAYING_INTERVAL_MS` | `5000` | Live now-playing refresh interval |
+| `METADATA_MAX_CONCURRENT` | `3` | Limit concurrent metadata lookups |
+| `RADIO_ALLOWED_HOSTS` | Empty | Optional hostname allowlist for public radio streams |
+| `DASHBOARD_PORT` | `0` | Enable the optional OAuth2 dashboard |
+
+See [`.env.docker.example`](.env.docker.example) for Docker options and [`.env.example`](.env.example) for local development. Spotify and Apple Music integrations require additional optional credentials; see [the detailed documentation](docs/DOCKER_INSTALL.md).
+
+### Data and backups
+
+- **Docker Compose:** keep the `pulse-data` named volume.
+- **Unraid:** back up `/mnt/user/appdata/pulse-discord-music`.
+- **Source install:** back up the directory configured through `DATA_DIR`.
+
+Queue state, favorites, DJ roles and listening statistics are stored locally. Deleting the persistent volume or AppData directory can erase them.
+
+## How it works
+
+```text
+Discord slash commands / buttons       Optional OAuth2 dashboard
+                 │                               │
+                 └───────────────┬───────────────┘
+                                 ▼
+                        PlayerManager
+                        ├─ per-guild players
+                        ├─ queue persistence
+                        └─ DJ permissions
+                                 │
+                                 ▼
+                      Audio / metadata providers
+                  YouTube · SoundCloud · public radio
+                  Spotify · Deezer · Apple Music¹
+                                 │
+                                 ▼
+                        yt-dlp + FFmpeg
+                                 │
+                                 ▼
+                         Discord Voice
 ```
 
-The container synchronizes Discord slash commands automatically on startup (unless disabled). The published GHCR image will become pullable after the Docker release workflow runs from `master`. Until then, use the local build override documented in the install guide.
+Pulse uses short-lived metadata caching, bounded lookup concurrency, stream retry/stall recovery and a sandboxed approach to radio URL handling. Stream URLs are resolved as needed; **Pulse does not keep a permanent cache of downloaded music**.
 
-This README is the canonical quick start. See [docs/CAHIER_DES_CHARGES.md](./docs/CAHIER_DES_CHARGES.md) for the complete project specification and [SECURITY.md](./SECURITY.md) before configuring credentials.
+## Troubleshooting
 
-## Operational safety
+| Problem | What to check |
+|---|---|
+| GHCR image cannot be pulled | Confirm the [Docker publish workflow](https://github.com/MEHDImp4/pulse/actions/workflows/docker-publish.yml) succeeded and the package is public |
+| Bot starts but commands are missing | Check `DISCORD_CLIENT_ID`, bot invite scopes, `DISCORD_GUILD_ID` and startup logs; global commands can take time to propagate |
+| No sound / stream errors | Try `/testaudio`; check the container logs and source availability; some videos are region-restricted or unavailable |
+| Playlists are empty | Verify the source URL, access restrictions and `PLAYLIST_MAX_ITEMS` |
+| Unraid cannot save data | Verify the AppData mount points to `/data` and inspect container logs; avoid deleting the AppData directory |
+| Dashboard login fails | Check HTTPS URL, OAuth Client Secret, exact Discord redirect URI and your Manage Server permission |
 
-- `/status` displays diagnostics only for the invoking Discord server (not the other servers using this bot).
-- Radio streams are opened through a DNS-pinned HTTP(S) client with public-address and per-redirect checks. FFmpeg only receives validated audio bytes, not arbitrary URLs.
-- To restrict radio traffic, set `RADIO_ALLOWED_HOSTS` to a comma-separated list of exact domain names.
-- The Dockerfile pins yt-dlp to a tested stable release. Runtime self-update is **disabled** by default; upgrade via an image rebuild after review.
-- Live now-playing cards refresh every 5 seconds by default (`NOWPLAYING_INTERVAL_MS`, minimum 2000 ms) to reduce Discord REST traffic.
+Logs: `docker compose logs --tail=100 bot`. For Unraid, use the container's **Logs** menu. If you're still stuck, [open a GitHub issue](https://github.com/MEHDImp4/pulse/issues/new) **without including credentials**.
 
-Quality gates:
+## Development and security
 
 ```sh
 npm ci
 npm run typecheck
 npm run build
 npm test
-docker build -t pulse-bot:test .
+docker build -t pulse:test .
 ```
 
-A real Discord voice smoke test (`/testaudio`, `/play`, `/skip`, `/leave`) is still required before public rollout.
+CI runs TypeScript checks, tests and Docker builds. Security analysis uses CodeQL. **Passing CI does not replace a live Discord voice playback test**, especially after changes to discord.js voice, yt-dlp, FFmpeg or the host network.
 
-## Search performance controls
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy / private vulnerability reporting](SECURITY.md)
+- [Docker and Unraid deployment guide](docs/DOCKER_INSTALL.md)
+- [Original project specification](docs/CAHIER_DES_CHARGES.md)
+- [Issues and suggestions](https://github.com/MEHDImp4/pulse/issues)
 
-Pulse reuses simultaneous identical metadata searches, caches short-lived
-flat playlists and caps concurrent yt-dlp metadata workers to avoid CPU
-and process spikes on busy servers. Audio streams are **not** cached or
-blocked by this lookup limiter.
+Pulse is open source under the [MIT License](LICENSE). It is not affiliated with Discord, YouTube, Spotify, Deezer, Apple Music or SoundCloud. Use music sources in accordance with their terms and applicable law.
 
-- `METADATA_MAX_CONCURRENT=3` limits simultaneous metadata subprocesses.
-- `METADATA_MAX_PENDING=64` caps waiting unique lookups; excess requests fail
-  quickly rather than growing an unlimited queue.
-- `METADATA_CACHE_TTL_MS=600000` and `METADATA_CACHE_MAX_ENTRIES=500`
-  bound the reusable metadata cache. Playlist/search cache entries are limited
-  to 5 minutes and at most 100 entries per provider.
+<p align="center"><strong>Built for shared listening. Hosted by you.</strong></p>
 
-## Phase 2 — Interactive music and playlists
-
-- `/search query:<title>` returns up to five tracks in a private select menu.
-  Only the requester can pick a result, from the original voice channel,
-  within 2 minutes. `/play` stays instant for users who prefer one command.
-- `/playlist` accepts YouTube and Deezer public playlists.
-- Spotify playlist import requires `SPOTIFY_CLIENT_ID`,
-  `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REFRESH_TOKEN`. Spotify's
-  2026 API restricts `/playlists/{id}/items` to playlists owned by or
-  shared with the OAuth account. Arbitrary public playlists **will not work**.
-- Apple Music catalog playlists require a developer JWT in
-  `APPLE_MUSIC_DEVELOPER_TOKEN` and optionally `APPLE_MUSIC_STOREFRONT`.
-  User-library playlists are not covered.
-- These services provide metadata only; Pulse resolves matching audio via
-  the YouTube provider. Missing/region-blocked tracks are skipped.
-
-## Phase 3 — Personal libraries
-
-- `/favorite add`, `/favorite list`, `/favorite remove position`,
-  `/favorite play position`: favorites are private to each Discord user.
-- `/myplaylist save name`, `list`, `delete name`, `load name`:
-  save the current song and queue, reload by resolving sources at playback.
-- Personal music data is stored locally in `DATA_DIR/music-library.json` with
-  atomic file replacement, up to 100 favorites and 20 lists/100 tracks per
-  user. Back up `DATA_DIR` to retain this data.
-
-## Phase 3 — Community controls
-
-- `/djrole add|remove|list` lets a Manage Server administrator configure
-  up to ten DJ roles per guild. Roles are checked on disruptive slash
-  commands **and** playback buttons. Configuration persists in
-  `DATA_DIR/dj-roles.json`.
-- `/fairqueue` reorders the pending queue in round-robin requester order
-  while keeping each user's requested song order. This is a one-time
-  balancing action, not a persistent scheduling mode.
-
-## Phase 4 — Web dashboard (OAuth Discord)
-
-Pulse includes an optional, responsive single-process web dashboard:
-- `/login` uses Discord OAuth2 Authorization Code with `identify guilds`.
-- Only Manage Server members, administrators and owners can inspect/control
-  their servers **where the bot is also installed**. Permissions are revalidated
-  on each API request.
-- Remote actions: pause, resume, skip, stop, set volume, remove/clear queue,
-  and fair-queue rotation. The dashboard is read-only if the bot has not joined
-  a voice channel.
-- Server-side OAuth tokens stay in memory; the browser only receives an
-  HttpOnly SameSite cookie and a separate CSRF token. Sessions disappear on
-  reboot or OAuth token expiry.
-
-Enable on the host:
-```env
-DASHBOARD_PORT=8080
-DASHBOARD_BIND=127.0.0.1
-DASHBOARD_PUBLIC_URL=https://pulse.example.com
-DASHBOARD_CLIENT_SECRET=your_discord_oauth_client_secret
-```
-Register the exact Discord OAuth2 redirect
-`https://pulse.example.com/oauth/callback` in the Discord developer portal.
-Place a TLS reverse proxy in front of the dashboard (for Docker, the optional
-`dashboard/docker-compose.dashboard.yml` exposes only 127.0.0.1:8080
-to the host; adjust networking to your reverse proxy).
-Never expose an HTTP dashboard publicly. CSRF and per-server guild access
-are enforced by the backend, not merely the frontend.
-
-The dashboard UI ships as static assets (no extra frontend dependencies)
-with a server-list sidebar, now-playing panel, volume control, drag-and-drop
-queue reordering, track search/addition, skip/stop, and Fair Queue.
-Remote actions are restricted to guild admins; the frontend is not a
-security boundary. A connected voice session is required to enqueue.
-
-## Listening insights and AutoDJ
-The dashboard shows per-server top 5 songs, artists, and total plays,
-saved in `DATA_DIR/listening-stats.json` (no listener IDs are stored).
-The AutoDJ candidate ranking prefers a similar duration/artist and
-penalizes karaoke, slowed and cover versions unless those keywords
-appear in the source track. Recommendations still contain randomness.
-
-## Installer sur Unraid
-
-Le template [Pulse-Discord-Music](./templates/unraid/pulse.xml) est conçu
-pour Docker → Add Container, avec les deux champs Discord requis, AppData
-persistant et aucun port ouvert par défaut. Voir le [guide Unraid](./docs/DOCKER_INSTALL.md#4-installation-native-unraid-sans-docker-compose).
-
-Le dépôt fournit aussi le fichier `ca_profile.xml` permettant de préparer
-une candidature au catalogue Community Applications. La présence de ce fichier
-**ne signifie pas** que l'app a déjà été acceptée dans le catalogue Unraid.
+<p align="center"><a href="#pulse">Back to top</a> · <a href="README.fr.md">Documentation en français</a></p>
