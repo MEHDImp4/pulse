@@ -95,6 +95,10 @@ export const env = {
   lyricsEnabled: boolEnv("LYRICS_ENABLED", true),
   lyricsApiBase: process.env.LYRICS_API_BASE?.trim() || "https://lrclib.net",
   lyricsTimeoutMs: intEnv("LYRICS_TIMEOUT_MS", 8_000),
+  dashboardPort: intEnv("DASHBOARD_PORT", 0),
+  dashboardBind: process.env.DASHBOARD_BIND?.trim() || "127.0.0.1",
+  dashboardPublicUrl: process.env.DASHBOARD_PUBLIC_URL?.trim() || undefined,
+  dashboardClientSecret: process.env.DASHBOARD_CLIENT_SECRET?.trim() || undefined,
   radioAllowedHosts: (process.env.RADIO_ALLOWED_HOSTS ?? "")
     .split(",")
     .map((host) => host.trim().toLowerCase())

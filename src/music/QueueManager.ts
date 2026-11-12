@@ -26,6 +26,14 @@ export class QueueManager {
     return this.tracks.shift();
   }
 
+  move(from: number, to: number): boolean {
+    if (!Number.isInteger(from) || !Number.isInteger(to) ||
+      from < 0 || from >= this.tracks.length || to < 0 || to >= this.tracks.length) return false;
+    const [track] = this.tracks.splice(from, 1);
+    this.tracks.splice(to, 0, track);
+    return true;
+  }
+
   removeAt(index: number): Track | undefined {
     if (!Number.isInteger(index) || index < 0 || index >= this.tracks.length) return undefined;
     return this.tracks.splice(index, 1)[0];

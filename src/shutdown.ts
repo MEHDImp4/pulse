@@ -1,6 +1,7 @@
 import type { Client, TextChannel } from "discord.js";
 import type { Logger } from "pino";
 import type { PlayerManager } from "./music/PlayerManager";
+import { listeningStats } from "./music/ListeningStats";
 
 const DISCONNECT_MESSAGE = "ℹ️ Déconnexion du bot...";
 const HARD_TIMEOUT_MS = 8_000;
@@ -29,6 +30,7 @@ export function createShutdown({ client, players, logger }: ShutdownDeps) {
       // Persist any pending per-session settings/queues before tearing down.
       players.flushSettings();
       players.flushQueues();
+      listeningStats.flush();
 
       // Send disconnect messages for every active playback session.
       const activePlayers = players.activePlayers();

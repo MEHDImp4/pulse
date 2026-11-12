@@ -22,6 +22,7 @@ import type { AudioProvider } from "../providers/AudioProvider";
 import { terminateAll } from "../utils/childProcess";
 import { logger } from "../utils/logger";
 import { recordTrackFailed, recordTrackStarted } from "../utils/metrics";
+import { listeningStats } from "./ListeningStats";
 import { DEFAULT_GUILD_SETTINGS, type GuildSettings } from "./GuildSettingsStore";
 import type { PlayerState } from "./PlayerState";
 import { QueueManager } from "./QueueManager";
@@ -867,6 +868,7 @@ export class GuildPlayer {
           // player would sit in BUFFERING forever and block the serial queue.
           await this.waitForPlaybackStart();
           recordTrackStarted();
+          listeningStats.record(this.guildId, track);
           logger.info(
             {
               guild: this.guildId,

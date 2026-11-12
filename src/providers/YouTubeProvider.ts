@@ -1,5 +1,5 @@
 import type { Track, TrackProvider } from "../music/Track";
-import { pickRandomRelatedTrack } from "../services/autoplay";
+import { pickSmartRelatedTrack } from "../services/autoplay";
 import { logger } from "../utils/logger";
 import { isYouTubeUrl, mixUrl, watchUrl } from "./youtube";
 import { YtDlpProvider, type YtDlpInfo } from "./YtDlpProvider";
@@ -36,7 +36,7 @@ export class YouTubeProvider extends YtDlpProvider {
     else logger.debug({ err: searchResult.reason, query: searchQuery }, "Related search failed");
 
     for (const entries of pools) {
-      const picked = pickRandomRelatedTrack(this.toTracks(entries, seed.requestedBy), seed.id, exclude);
+      const picked = pickSmartRelatedTrack(this.toTracks(entries, seed.requestedBy), seed, exclude);
       if (picked) return picked;
     }
 
@@ -48,7 +48,7 @@ export class YouTubeProvider extends YtDlpProvider {
           (await this.fetchEntries(`ytsearch10:${query}`, 10)).entries,
           seed.requestedBy,
         );
-        const picked = pickRandomRelatedTrack(candidates, seed.id, exclude);
+        const picked = pickSmartRelatedTrack(candidates, seed, exclude);
         if (picked) return picked;
       } catch (error) {
         logger.debug({ err: error, query }, "Related search failed");

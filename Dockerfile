@@ -24,6 +24,7 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY dashboard ./dashboard
 RUN npm run build && npm prune --omit=dev
 
 # --- Runtime stage -----------------------------------------------------------
@@ -42,6 +43,7 @@ WORKDIR /app
 # Production dependencies + compiled output only.
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/dashboard ./dashboard
 COPY package.json ./
 
 # Pre-create the persistence mount owned by the runtime user so the named volume
