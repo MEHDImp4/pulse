@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import { canUseDjControls, DJ_ONLY_MESSAGE } from "../utils/permissions";
+import { djRoleStore, memberRoleIds } from "../music/DjRoleStore";
 import { replyTemporary } from "../utils/reply";
 import { requireControlChannel } from "./helpers";
 import type { CommandDefinition } from "./types";
@@ -20,7 +21,7 @@ export const remove: CommandDefinition = {
     const context = await requireControlChannel(interaction, players);
     if (!context) return;
 
-    if (!canUseDjControls(interaction.memberPermissions)) {
+    if (!canUseDjControls(interaction.memberPermissions, memberRoleIds(interaction.member), djRoleStore.getRoles(interaction.guildId))) {
       await replyTemporary(interaction, DJ_ONLY_MESSAGE);
       return;
     }

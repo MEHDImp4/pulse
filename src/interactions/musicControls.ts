@@ -11,6 +11,7 @@ import { computeSkipThreshold } from "../music/voteSkip";
 import { refreshNowPlaying } from "../services/nowPlaying";
 import { parseMusicControl } from "../ui/controls";
 import { canUseDjControls, DJ_ONLY_MESSAGE } from "../utils/permissions";
+import { djRoleStore, memberRoleIds } from "../music/DjRoleStore";
 import { formatDuration } from "../utils/time";
 
 async function replyPrivate(interaction: ButtonInteraction, content: string): Promise<void> {
@@ -94,7 +95,7 @@ export async function handleMusicControl(
     return true;
   }
 
-  const isDj = canUseDjControls(interaction.memberPermissions);
+  const isDj = canUseDjControls(interaction.memberPermissions, memberRoleIds(interaction.member), djRoleStore.getRoles(interaction.guildId));
   const { action } = parsed;
 
   switch (action) {
