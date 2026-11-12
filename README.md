@@ -108,7 +108,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Need a local development build instead? See [the Docker install guide](docs/DOCKER_INSTALL.md#5-build-local-de-developpement).
+Need a local development build instead? See [the Docker install guide](docs/DOCKER_INSTALL.md).
 
 ### Run from source
 

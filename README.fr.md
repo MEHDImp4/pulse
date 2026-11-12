@@ -109,7 +109,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Pour compiler une image Docker localement, consulte le [guide Docker](docs/DOCKER_INSTALL.md#5-build-local-de-developpement).
+Pour compiler une image Docker localement, consulte le [guide Docker](docs/DOCKER_INSTALL.md).
 
 ### Installation depuis le code source
 

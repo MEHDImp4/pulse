@@ -40,7 +40,7 @@ CI (build + tests) must pass before a PR can be merged.
 1. Create `src/commands/mycommand.ts` exporting `mycommand: CommandDefinition`.
 2. Add it to the array in `src/commands/index.ts`.
 3. Add a pure test under `tests/` if it has logic worth testing.
-4. Update the command tables in `README.md` and `README.en.md`.
+4. Update the command tables in `README.md` and `README.fr.md`.
 
 ### Commit messages
 
@@ -88,7 +88,7 @@ La CI (build + tests) doit passer pour qu'une PR soit fusionnée.
 1. Crée `src/commands/macommande.ts` exportant `macommande: CommandDefinition`.
 2. Ajoute-la au tableau dans `src/commands/index.ts`.
 3. Ajoute un test pur sous `tests/` si elle contient de la logique à tester.
-4. Mets à jour les tableaux de commandes dans `README.md` et `README.en.md`.
+4. Mets à jour les tableaux de commandes dans `README.md` et `README.fr.md`.
 
 ### Messages de commit
 
