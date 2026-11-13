@@ -19,7 +19,7 @@
   "dependencies": {
     "@discordjs/opus": "0.10.0",
     "@discordjs/voice": "1.0.0-dev.1789257813-c626815bf",
-    "discord.js": "14.27.0",
+    "discord.js": "14.28.1",
     "pino": "10.4.0"
   },
   "devDependencies": {
