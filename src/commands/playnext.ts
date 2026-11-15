@@ -1,6 +1,7 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
-import { playbackControlsRows } from "../ui/controls";
-import { nowPlayingEmbed, queuedEmbed } from "../ui/embeds";
+import { publishNowPlaying } from "../services/nowPlaying";
+import { queuedEmbed } from "../ui/embeds";
+import { scheduleInteractionReplyDeletion } from "../utils/reply";
 import { preparePlayback } from "./helpers";
 import type { CommandDefinition } from "./types";
 
@@ -24,7 +25,7 @@ export const playnext: CommandDefinition = {
     }
 
     // Acknowledge before any work so a slow lookup can never expire the token.
-    await interaction.deferReply();
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const prep = await preparePlayback(interaction, players);
     if (prep.status === "error") {
@@ -53,14 +54,12 @@ export const playnext: CommandDefinition = {
       const result = await player.playNext(track);
 
       if (result.started) {
-        const message = await interaction.editReply({
-          embeds: [nowPlayingEmbed(player)],
-          components: playbackControlsRows(player.channelId, player.state === "PAUSED"),
-        });
-        player.setNowPlayingMessage(message);
+        await publishNowPlaying(interaction, player);
+        await interaction.editReply("▶️ Lecture lancée.");
       } else {
         await interaction.editReply({ embeds: [queuedEmbed(track, { pending: true })] });
       }
+      scheduleInteractionReplyDeletion(interaction);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
       await interaction.editReply(`❌ Impossible d'ajouter ce morceau : ${message}`);
