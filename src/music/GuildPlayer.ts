@@ -169,7 +169,17 @@ export class GuildPlayer {
         }
         logger.info({ guild: this.guildId }, "Audio player entered IDLE");
         const finished = this._currentTrack;
-        await this.killProcesses();
+        // If a standby stream exists, terminate the previous FFmpeg/yt-dlp
+        // processes concurrently with advancing the queue. Waiting for their
+        // OS exit before playing already-buffered audio adds audible silence.
+        const oldCleanup = this.killProcesses();
+        if (this.nextTrackPreloader.key) {
+          void oldCleanup.catch((error) => {
+            logger.warn({ err: error, guild: this.guildId }, "Old audio process cleanup failed");
+          });
+        } else {
+          await oldCleanup;
+        }
         this.currentResource = undefined;
         this._currentTrack = undefined;
         this.skipVotes.clear();
