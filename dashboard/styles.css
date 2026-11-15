@@ -21,3 +21,13 @@
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;scroll-behavior:auto!important}}
 
 .insights{padding:24px;margin-top:20px}.insights-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:30px}.insights h3{font-size:12px;letter-spacing:.5px;color:#b6bbd0;margin:0 0 13px}.top-list{padding:0;margin:0;list-style:none}.top-item{display:flex;align-items:center;gap:11px;padding:13px 8px;border-top:1px solid #2c3042;font-size:12px}.top-number{color:#8977f5;font-weight:800;min-width:15px}.top-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top-item strong{font-size:11px;color:#939ab0;font-weight:600}@media(max-width:650px){.insights{padding:17px}.insights-grid{grid-template-columns:1fr;gap:22px}}
+
+/* Phase 3 — compact party controls and per-guild audio diagnostics. */
+.party-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:17px;padding:15px;background:#13182a;border:1px solid #32394f;border-radius:12px}
+.party-tools>div{flex:1;min-width:155px}.party-tools strong{color:#efeeff;font-size:12px}.party-tools p{margin:5px 0 0;color:#a0a8bd;font-size:11px}
+.party-tools label{color:#aab1c9;font-size:11px}.party-tools select{color:#e9e6ff;background:#232640;border:1px solid #494466;border-radius:8px;padding:9px;min-width:58px}
+.party-tools .button{white-space:nowrap}.health{padding:24px;margin-top:20px}.health-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.health-grid>div{padding:17px;border:1px solid #30364c;background:#151a2a;border-radius:12px;min-width:0}
+.health-grid span{display:block;color:#9ca5bd;font-size:11px;line-height:1.4}.health-grid strong{display:block;color:#d9d4ff;font-size:21px;margin-top:7px;font-weight:750}
+.health-note{color:#8891aa;font-size:11px;line-height:1.5;margin:16px 0 0}
+@media(max-width:750px){.health-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.health{padding:17px}}
