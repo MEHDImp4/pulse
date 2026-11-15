@@ -140,6 +140,8 @@ Les commandes de lecture (`/play`, `/playnext`, `/playlist`) utilisent des confi
 
 **Cache de toute la file (nouveau) :** Pulse télécharge progressivement **tous les titres compatibles en attente**, pas seulement le prochain, en conservant l'audio compressé dans `DATA_DIR/audio-cache`. Les morceaux prioritaires sont ceux proches du début de la file. Un cache disque **global de 1 Go** est partagé entre les serveurs, avec **deux téléchargements simultanés** et **64 Mo maximum par titre**. Les titres déjà téléchargés sont réutilisés après un redémarrage ; le cache élimine les éléments moins prioritaires lorsqu'il atteint sa limite. Les flux radio en direct et les pistes non compatibles ne sont pas téléchargés. Le préchargement audio de la prochaine piste reste actif pour éviter le délai de décodage à la transition. Options : `CACHE_QUEUE_AUDIO`, `QUEUE_CACHE_MAX_MB`, `QUEUE_CACHE_TRACK_MAX_MB`, `QUEUE_CACHE_CONCURRENCY`, `QUEUE_CACHE_DOWNLOAD_TIMEOUT_MS`.
 
+**Diagnostic de stabilité :** `/status` affiche maintenant les transitions mesurées en millisecondes (moyenne, p95 sur les 50 dernières), les récupérations après blocage, le nombre de lectures depuis le cache et les morceaux de la file encore en téléchargement. Les statistiques sont limitées à la session du serveur et ne contiennent pas les titres ou identifiants des autres serveurs. Une transition de plus d'une seconde est signalée dans les logs. Ces mesures correspondent au délai observé par le bot pour démarrer le morceau suivant, et non à une mesure acoustique de silence.
+
 Le cache accélère fortement les transitions pour les titres entièrement téléchargés, mais ne peut pas garantir **zéro interruption** : le réseau, un téléchargement inachevé, les restrictions d'une source ou un disque plein peuvent encore entraîner une attente. L'activation implique du trafic réseau et l'utilisation de l'espace disque configuré.
 
 **Transitions musicales plus rapides :** lorsqu’un morceau possède une durée connue et qu’un suivant est en attente, Pulse commence à préparer son flux audio **25 secondes avant la fin**. Une seule piste est préchargée par serveur ; les flux abandonnés sont arrêtés automatiquement si la file est modifiée, si la lecture est interrompue ou si une préparation échoue. Le préchargement ne garantit pas zéro silence en cas de réseau lent ou de piste sans durée connue. Options Docker/Unraid : `PRELOAD_NEXT_TRACK`, `PRELOAD_LEAD_SECONDS`, `PRELOAD_TIMEOUT_MS` et `PRELOAD_SWITCH_WAIT_MS`.
@@ -159,7 +161,7 @@ Le cache accélère fortement les transitions pour les titres entièrement tél�
 | `/fairqueue` | Alterne les demandes entre les utilisateurs |
 | `/voteskip` | Vote pour passer un morceau |
 | `/lyrics` | Recherche les paroles disponibles |
-| `/status`, `/testaudio`, `/help`, `/leave` | Diagnostic, aide et déconnexion |
+| `/status`, `/testaudio`, `/help`, `/leave` | Diagnostic (temps de transition, erreurs, préchargement par serveur), aide et déconnexion |
 
 Certaines actions affectant tous les utilisateurs nécessitent un rôle DJ configuré ou la permission Discord **Gérer le serveur**. La commande `/fairqueue` réorganise la file une fois ; ce n'est pas un mode permanent.
 
@@ -242,7 +244,7 @@ Commandes Discord / boutons        Dashboard OAuth2 (facultatif)
                           Discord Voice
 ```
 
-Pulse met en cache temporairement certaines métadonnées et limite les recherches simultanées. Il gère les reprises après certaines erreurs de streaming et ne conserve **pas de téléchargement permanent des fichiers audio**.
+Pulse conserve en cache disque les fichiers audio compressés compatibles dans la limite configurée et met en cache temporairement certaines métadonnées. Il limite les recherches simultanées et gère les reprises après certaines erreurs de streaming.
 
 ## Dépannage
 
