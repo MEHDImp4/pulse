@@ -40,9 +40,15 @@
         <section id="gate" class="gate panel">
           <div class="gate-art" aria-hidden="true">♫</div>
           <div class="eyebrow">ACCÈS SÉCURISÉ</div>
-          <h2>Connecte ton compte Discord</h2>
-          <p>Tu verras uniquement les serveurs où tu possèdes les droits de gestion et où Pulse est présent.</p>
-          <a class="button primary" href="/login">Se connecter avec Discord <span>↗</span></a>
+          <h2 id="login-title">Accède au dashboard Pulse</h2>
+          <p id="login-description">Identifie-toi pour administrer ton bot musical.</p>
+          <a id="discord-login" class="button primary" href="/login" hidden>Se connecter avec Discord <span>↗</span></a>
+          <form id="local-login" class="local-login" hidden autocomplete="on">
+            <label for="local-password">Mot de passe du dashboard</label>
+            <input id="local-password" type="password" name="password" minlength="12" maxlength="256"
+              required autocomplete="current-password" placeholder="Ton mot de passe Unraid">
+            <button class="button primary" type="submit">Accéder au dashboard</button>
+          </form>
         </section>
         <section id="workspace" hidden>
           <div class="stat-grid">
