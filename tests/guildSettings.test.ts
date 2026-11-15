@@ -151,6 +151,7 @@ describe("audio quality settings", () => {
     expect(sanitizeSettings({ fadeSeconds: "7" }).fadeSeconds).toBe(2);
     expect(sanitizeSettings({ crossfadeSeconds: 999 }).crossfadeSeconds).toBe(5);
     expect(sanitizeSettings({ crossfadeSeconds: -4 }).crossfadeSeconds).toBe(0);
+    expect(sanitizeSettings({ crossfadeSeconds: "3" }).crossfadeSeconds).toBe(0);
     expect(DEFAULT_GUILD_SETTINGS.crossfadeSeconds).toBe(0);
   });
 
