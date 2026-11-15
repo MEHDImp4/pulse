@@ -77,8 +77,38 @@
                 <button id="fair" class="button ghost" data-action="fairqueue" type="button">⚖ Équilibrer</button>
                 <button class="button danger-soft" data-action="clear" type="button">Vider la file</button>
               </div>
+              <div class="party-tools">
+                <div>
+                  <strong>Mode soirée</strong>
+                  <p id="party-state">Désactivé · demandes libres</p>
+                </div>
+                <label for="party-limit">Titres par personne</label>
+                <select id="party-limit" aria-label="Limite de morceaux en attente par personne">
+                  <option value="1">1</option><option value="2">2</option>
+                  <option value="3" selected>3</option><option value="4">4</option>
+                  <option value="5">5</option><option value="6">6</option>
+                  <option value="7">7</option><option value="8">8</option>
+                  <option value="9">9</option><option value="10">10</option>
+                </select>
+                <button id="party-toggle" class="button primary" type="button">Activer</button>
+              </div>
             </section>
           </div>
+          <section class="health panel">
+            <div class="panel-head">
+              <div><div class="eyebrow">FLUIDITÉ &amp; PRÉCHARGEMENT</div><h2>État audio</h2></div>
+              <span id="cache-pill" class="pill">CACHE INACTIF</span>
+            </div>
+            <div class="health-grid">
+              <div><span>Musique en cache</span><strong id="cache-ready">—</strong></div>
+              <div><span>En téléchargement</span><strong id="cache-downloads">—</strong></div>
+              <div><span>Latence moyenne de transition</span><strong id="latency-avg">—</strong></div>
+              <div><span>95e percentile</span><strong id="latency-p95">—</strong></div>
+              <div><span>Crossfades réalisés</span><strong id="crossfade-count">—</strong></div>
+              <div><span>Récupérations audio</span><strong id="recoveries-count">—</strong></div>
+            </div>
+            <p class="health-note">Les transitions sont mesurées côté bot. Elles ne constituent pas une mesure acoustique du silence.</p>
+          </section>
           <section class="insights panel">
             <div class="panel-head"><div><div class="eyebrow">TON SERVEUR</div><h2>Statistiques musicales</h2></div><span class="count">TOP 5</span></div>
             <div class="insights-grid">

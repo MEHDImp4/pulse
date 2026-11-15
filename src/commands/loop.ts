@@ -49,6 +49,10 @@ export const loop: CommandDefinition = {
       return;
     }
 
+    if (context.player.partyMode && mode === "track") {
+      await replyTemporary(interaction, "❌ La boucle d'un seul morceau est désactivée en mode soirée, pour laisser jouer les demandes de chacun.");
+      return;
+    }
     context.player.loopMode = mode as LoopMode;
     await replyTemporary(interaction, `🔁 Répétition réglée sur **${LABELS[mode]}**.`);
   },

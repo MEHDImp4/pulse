@@ -5,6 +5,7 @@ import { commands, commandMap } from "./commands";
 import type { CommandContext } from "./commands/types";
 import { handleMusicControl } from "./interactions/musicControls";
 import { handleQueuePagination } from "./interactions/queuePagination";
+import { handleQueueAction, handleQueueSelection } from "./interactions/queueActions";
 import { handleSearchSelection } from "./interactions/searchSelection";
 import { env } from "./config/env";
 import { PlayerManager } from "./music/PlayerManager";
@@ -54,6 +55,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isStringSelectMenu()) {
     try {
       if (await handleSearchSelection(interaction, players)) return;
+      if (await handleQueueSelection(interaction, players)) return;
     } catch (error) {
       logger.error({ err: error }, "Search selection failed");
       if (interaction.deferred || interaction.replied) await interaction.editReply("❌ Sélection impossible.").catch(() => undefined);
@@ -65,6 +67,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
       if (await handleMusicControl(interaction, players)) return;
       if (await handleQueuePagination(interaction, players)) return;
+      if (await handleQueueAction(interaction, players)) return;
     } catch (error) {
       logger.error(
         { err: error, customId: interaction.customId, guild: interaction.guildId },

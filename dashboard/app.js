@@ -32,7 +32,7 @@ function formatTime(seconds) {
 }
 
 function setConnected(connected) {
-  for (const element of document.querySelectorAll("[data-action],#volume,#song-query,#add-song button")) {
+  for (const element of document.querySelectorAll("[data-action],#volume,#song-query,#add-song button,#party-toggle,#party-limit")) {
     element.disabled = !connected;
   }
 }
@@ -52,7 +52,7 @@ function renderQueue(queue) {
   queue.forEach((track, index) => {
     const li = document.createElement("li");
     li.className = "queue-item";
-    li.draggable = true;
+    li.draggable = !state.player?.partyMode;
     li.dataset.position = String(index);
     const num = document.createElement("span"); num.className = "queue-num"; num.textContent = String(index + 1).padStart(2, "0");
     const icon = document.createElement("span"); icon.className = "queue-icon"; icon.textContent = "♫";
@@ -70,9 +70,10 @@ function renderQueue(queue) {
       event.dataTransfer.effectAllowed = "move";
     });
     li.addEventListener("dragend", () => li.classList.remove("dragging"));
-    li.addEventListener("dragover", (event) => event.preventDefault());
+    li.addEventListener("dragover", (event) => { if (!state.player?.partyMode) event.preventDefault(); });
     li.addEventListener("drop", (event) => {
       event.preventDefault();
+      if (state.player?.partyMode) return;
       const from = Number(event.dataTransfer.getData("text/plain"));
       if (Number.isInteger(from) && from !== index) sendAction("move", { value: from, target: index });
     });
@@ -118,6 +119,13 @@ function renderStatus(data) {
     $("song-artist").textContent = "Lance /play dans Discord pour commencer";
     $("volume-stat").textContent = "—";
     $("duration").textContent = "--:--";
+    $("party-state").textContent = "Aucun salon vocal connecté";
+    $("party-toggle").textContent = "Activer";
+    $("party-limit").value = "3";
+    for (const id of ["cache-ready", "cache-downloads", "latency-avg", "latency-p95", "crossfade-count", "recoveries-count"]) {
+      $(id).textContent = "—";
+    }
+    $("cache-pill").textContent = "CACHE INACTIF";
     renderQueue([]);
     return;
   }
@@ -135,13 +143,32 @@ function renderStatus(data) {
   $("volume-stat").textContent = `${p.volume}%`;
   $("mode").textContent = `Boucle : ${p.loopMode || "off"}`;
   $("filter").textContent = `Filtre : ${p.filter || "off"}`;
+  $("party-state").textContent = p.partyMode
+    ? "Actif · file équitable automatiquement"
+    : "Désactivé · demandes libres";
+  $("party-toggle").textContent = p.partyMode ? "Désactiver" : "Activer";
+  $("party-limit").value = String(p.partyMaxPerUser ?? 3);
+  const cache = p.cache;
+  $("cache-ready").textContent = cache ? `${cache.ready} / ${cache.queued}` : "—";
+  $("cache-downloads").textContent = cache ? String(cache.downloading) : "—";
+  $("cache-pill").textContent = cache
+    ? `${cache.pending} à préparer · ${cache.failed} échec(s)` : "CACHE INACTIF";
+  const diag = p.diagnostics;
+  $("latency-avg").textContent = diag?.transitions ? `${diag.avgTransitionMs} ms` : "—";
+  $("latency-p95").textContent = diag?.transitions ? `${diag.p95TransitionMs} ms` : "—";
+  $("crossfade-count").textContent = String(diag?.crossfadesStarted ?? 0);
+  $("recoveries-count").textContent = String(diag?.stallRecoveries ?? 0);
+  document.querySelector(".queue-meta span").textContent = p.partyMode
+    ? "MODE SOIRÉE · ORDRE AUTOMATIQUE" : "GLISSE POUR RÉORGANISER";
   renderQueue(p.queue || []);
 }
 
 async function loadGuild() {
   if (!state.guildId || state.busy) return;
   try {
-    const data = await api(`/api/guilds/${state.guildId}`);
+    const guildId = state.guildId;
+    const data = await api(`/api/guilds/${guildId}`);
+    if (state.guildId !== guildId) return; // avoid stale cross-guild refreshes
     renderStatus(data);
   } catch (error) { notice(error.message); }
 }
@@ -212,6 +239,18 @@ async function start() {
     if (error.message !== "Connexion requise") notice(error.message);
   }
 }
+$("party-toggle").addEventListener("click", () => {
+  if (!state.player) return;
+  void sendAction("party", {
+    value: state.player.partyMode ? 0 : 1,
+    target: Number($("party-limit").value),
+  });
+});
+$("party-limit").addEventListener("change", () => {
+  if (state.player?.partyMode) {
+    void sendAction("party", { value: 1, target: Number($("party-limit").value) });
+  }
+});
 for (const button of document.querySelectorAll("[data-action]")) {
   button.addEventListener("click", () => sendAction(button.dataset.action));
 }

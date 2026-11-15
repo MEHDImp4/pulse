@@ -202,6 +202,10 @@ export function startDashboard(players: PlayerManager, client: Client): Server |
             queue: player.queue.snapshot().map((t) => ({ title: t.title, author: t.author, requester: t.requestedBy.username })),
             volume: player.volume, loopMode: player.loopMode, autoplay: player.autoplay,
             filter: player.filter,
+            partyMode: player.partyMode,
+            partyMaxPerUser: player.partyMaxPerUser,
+            cache: players.cacheForGuild(guildId) ?? null,
+            diagnostics: player.diagnostics.snapshot(),
           } : null,
           uptimeSeconds: Math.floor(process.uptime()),
           listening: listeningStats.get(guildId),
@@ -248,6 +252,9 @@ export function startDashboard(players: PlayerManager, client: Client): Server |
           player.notifyQueueChange();
           break;
         case "move":
+          if (player.partyMode) {
+            reply(res, 409, { error: "Le mode soirée gère automatiquement l'ordre de la file" }); return;
+          }
           if (!Number.isInteger(payload.value) || !Number.isInteger(payload.target) ||
              !player.queue.move(payload.value!, payload.target!)) {
             reply(res, 400, { error: "Déplacement invalide" }); return;
@@ -271,6 +278,14 @@ export function startDashboard(players: PlayerManager, client: Client): Server |
         case "fairqueue":
           player.queue.fairQueue();
           player.notifyQueueChange();
+          break;
+        case "party":
+          if ((payload.value !== 0 && payload.value !== 1) ||
+              (payload.target !== undefined &&
+               (!Number.isInteger(payload.target) || payload.target < 1 || payload.target > 10))) {
+            reply(res, 400, { error: "Mode soirée ou limite invalide" }); return;
+          }
+          player.configureParty(payload.value === 1, payload.target ?? player.partyMaxPerUser);
           break;
         case "clear":
           player.queue.clear();

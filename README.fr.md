@@ -160,11 +160,12 @@ Le cache accélère fortement les transitions pour les titres entièrement tél�
 | `/myplaylist save`, `list`, `load`, `delete` | Sauvegarde et recharge tes playlists |
 | `/djrole add`, `remove`, `list` | Configure les rôles DJ |
 | `/fairqueue` | Alterne les demandes entre les utilisateurs |
+| `/party [mode:on|off] [limite:1..10]` | Mode soirée continu : file équitable et limite de titres par personne |
 | `/voteskip` | Vote pour passer un morceau |
 | `/lyrics` | Recherche les paroles disponibles |
 | `/status`, `/testaudio`, `/help`, `/leave` | Diagnostic (temps de transition, erreurs, préchargement par serveur), aide et déconnexion |
 
-Certaines actions affectant tous les utilisateurs nécessitent un rôle DJ configuré ou la permission Discord **Gérer le serveur**. La commande `/fairqueue` réorganise la file une fois ; ce n'est pas un mode permanent.
+Certaines actions affectant tous les utilisateurs nécessitent un rôle DJ configuré ou la permission Discord **Gérer le serveur**. La commande `/fairqueue` réorganise la file une fois. `/party mode:on` active le mode permanent.
 
 Les résultats de `/search` sont accessibles uniquement à leur demandeur dans le salon vocal d'origine et expirent au bout de deux minutes.
 
@@ -175,6 +176,14 @@ Les résultats de `/search` sont accessibles uniquement à leur demandeur dans l
 `/quality crossfade:3` active un **vrai chevauchement audio** de trois secondes : lorsque les deux pistes non live ont une durée connue et sont **déjà entièrement en cache**, FFmpeg mélange la fin de la première avec le début de la seconde. Un seul flux mélangé poursuit ensuite la lecture de la seconde. Le crossfade est **désactivé par défaut** ; il fonctionne avec le filtre `off` et la suppression des silences désactivée, et retombe automatiquement sur le préchargement classique si une piste manque, si la file change, si le réseau est lent ou si les durées ne sont pas fiables. Les commandes manuelles `/skip` et `/seek` conservent leur comportement standard.
 
 Attention : le crossfade raccourcit volontairement la séparation entre deux titres, et une durée de piste incorrecte peut provoquer un décalage. Tester d'abord `crossfade:2` ou `crossfade:3` sur une petite file de morceaux déjà en cache. Les fonctions d'atténuation et normalisation peuvent augmenter légèrement la charge CPU.
+
+### Mode soirée et file interactive
+
+Le **Party Mode** (`/party mode:on`) maintient un ordre équitable automatiquement lorsque des morceaux sont ajoutés, retirés ou joués. Chaque personne est limitée à **3 morceaux en attente par défaut** (`/party limite:5` pour ajuster de 1 à 10). Les titres déjà présents sont conservés et réorganisés, la limite s'appliquant uniquement aux nouveaux ajouts. Seuls les DJ peuvent activer/désactiver le mode ou changer la limite. La boucle d'un seul morceau est automatiquement désactivée en mode soirée afin de ne pas bloquer les demandes. `/party mode:off` restaure une gestion manuelle de la file.
+
+Avec `/queue`, un **menu déroulant** permet désormais de sélectionner l'un des morceaux de la page. Les DJ présents dans le salon vocal peuvent ensuite le monter, le descendre ou le supprimer depuis un panneau privé. Une sélection devenue obsolète après changement de la file est refusée ; en Party Mode, le déplacement manuel est désactivé pour conserver l'équité.
+
+Le dashboard facultatif affiche le mode soirée, la limite par utilisateur, le nombre de titres déjà en cache, les téléchargements en cours ainsi que les mesures de transition audio déjà disponibles via `/status`. Ses contrôles sont protégés par l'authentification Discord OAuth2, la vérification des permissions de gestion du serveur et le jeton CSRF existants.
 
 ## Dashboard web facultatif
 

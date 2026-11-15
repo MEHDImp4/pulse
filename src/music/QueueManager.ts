@@ -59,6 +59,10 @@ export class QueueManager {
     return [...this.tracks];
   }
 
+  countByRequester(requesterId: string): number {
+    return this.tracks.filter((track) => track.requestedBy.id === requesterId).length;
+  }
+
   get size(): number {
     return this.tracks.length;
   }

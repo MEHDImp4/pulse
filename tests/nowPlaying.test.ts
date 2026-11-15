@@ -11,6 +11,8 @@ function snapshot(overrides: Partial<NowPlayingSnapshot> = {}): NowPlayingSnapsh
     loopMode: "off",
     autoplay: true,
     queueSize: 2,
+    partyMode: false,
+    partyMaxPerUser: 3,
     ...overrides,
   };
 }
@@ -39,6 +41,8 @@ describe("renderSignature", () => {
     expect(renderSignature(snapshot({ autoplay: false }))).not.toBe(base);
     expect(renderSignature(snapshot({ trackId: "t2" }))).not.toBe(base);
     expect(renderSignature(snapshot({ queueSize: 3 }))).not.toBe(base);
+    expect(renderSignature(snapshot({ partyMode: true }))).not.toBe(base);
+    expect(renderSignature(snapshot({ partyMaxPerUser: 5 }))).not.toBe(base);
     expect(renderSignature(snapshot({ state: "PLAYING" }))).not.toBe(
       renderSignature(snapshot({ state: "BUFFERING" })),
     );

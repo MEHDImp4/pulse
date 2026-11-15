@@ -12,6 +12,7 @@ import { loop } from "./loop";
 import { lyrics } from "./lyrics";
 import { nowplaying } from "./nowplaying";
 import { pause } from "./pause";
+import { party } from "./party";
 import { play } from "./play";
 import { playlist } from "./playlist";
 import { playnext } from "./playnext";
@@ -40,6 +41,7 @@ export const commands: CommandDefinition[] = [
   playlist,
   testaudio,
   pause,
+  party,
   resume,
   skip,
   forceskip,
