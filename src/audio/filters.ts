@@ -51,6 +51,8 @@ export interface AudioQualityOptions {
   trimStartSilence?: boolean;
   /** Zero disables fades; 1-5 seconds provides softer boundaries. */
   fadeSeconds?: number;
+  /** In crossfade mode, keep the tail audible until the overlap begins. */
+  skipFadeOut?: boolean;
 }
 
 export function sanitizeFadeSeconds(value: unknown): number {
@@ -98,7 +100,7 @@ export function buildFilterChain(
   }
 
   // Do not add an end fade when duration is unknown, e.g. a live radio.
-  if (fade > 0 && totalDurationSeconds !== undefined && Number.isFinite(totalDurationSeconds)) {
+  if (!options.skipFadeOut && fade > 0 && totalDurationSeconds !== undefined && Number.isFinite(totalDurationSeconds)) {
     const remaining = totalDurationSeconds - Math.max(0, startSeconds);
     if (remaining > fade * 2) {
       const fadeOutStart = Number((totalDurationSeconds - fade).toFixed(3));
