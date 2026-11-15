@@ -12,6 +12,7 @@ import {
 describe("sanitizeSettings", () => {
   it("keeps valid values", () => {
     expect(sanitizeSettings({ volume: 30, loopMode: "track", autoplay: true, filter: "8d" })).toEqual({
+      ...DEFAULT_GUILD_SETTINGS,
       volume: 30,
       loopMode: "track",
       autoplay: true,
@@ -33,7 +34,8 @@ describe("sanitizeSettings", () => {
 
 describe("mergeSettings", () => {
   it("updates only the provided field", () => {
-    expect(mergeSettings({ volume: 20, loopMode: "off", autoplay: true, filter: "off" }, { loopMode: "queue" })).toEqual({
+    expect(mergeSettings({ ...DEFAULT_GUILD_SETTINGS, volume: 20, loopMode: "off", autoplay: true, filter: "off" }, { loopMode: "queue" })).toEqual({
+      ...DEFAULT_GUILD_SETTINGS,
       volume: 20,
       loopMode: "queue",
       autoplay: true,
@@ -69,7 +71,7 @@ describe("GuildSettingsStore", () => {
 
     const reloaded = new GuildSettingsStore(file, 0);
     reloaded.load();
-    expect(reloaded.get("g1:chan", "g1")).toEqual({ volume: 35, loopMode: "queue", autoplay: true, filter: "off" });
+    expect(reloaded.get("g1:chan", "g1")).toEqual({ ...DEFAULT_GUILD_SETTINGS, volume: 35, loopMode: "queue", autoplay: true, filter: "off" });
   });
 
   it("keeps different sessions of the same guild independent", () => {
@@ -92,7 +94,7 @@ describe("GuildSettingsStore", () => {
 
     const store = new GuildSettingsStore(file, 0);
     store.load();
-    expect(store.get("g1:brand-new", "g1")).toEqual({ volume: 20, loopMode: "track", autoplay: true, filter: "off" });
+    expect(store.get("g1:brand-new", "g1")).toEqual({ ...DEFAULT_GUILD_SETTINGS, volume: 20, loopMode: "track", autoplay: true, filter: "off" });
   });
 
   it("migrates the legacy v1 flat format into guild defaults", () => {
@@ -101,7 +103,7 @@ describe("GuildSettingsStore", () => {
 
     const store = new GuildSettingsStore(file, 0);
     store.load();
-    expect(store.get("g1:any-chan", "g1")).toEqual({ volume: 30, loopMode: "queue", autoplay: true, filter: "off" });
+    expect(store.get("g1:any-chan", "g1")).toEqual({ ...DEFAULT_GUILD_SETTINGS, volume: 30, loopMode: "queue", autoplay: true, filter: "off" });
   });
 
   it("persists the autoplay toggle", () => {
@@ -137,5 +139,34 @@ describe("GuildSettingsStore", () => {
     const store = new GuildSettingsStore(file, 0);
     store.load();
     expect(store.get("g1:chan", "g1")).toEqual(DEFAULT_GUILD_SETTINGS);
+  });
+});
+
+describe("audio quality settings", () => {
+  it("keeps safe defaults and clamps fade times", () => {
+    expect(sanitizeSettings({ fadeSeconds: 999, normalize: true, trimStartSilence: true }))
+      .toMatchObject({ fadeSeconds: 5, normalize: true, trimStartSilence: true });
+    expect(sanitizeSettings({ fadeSeconds: -8, normalize: "yes", trimStartSilence: 42 }))
+      .toMatchObject({ fadeSeconds: 0, normalize: false, trimStartSilence: false });
+    expect(sanitizeSettings({ fadeSeconds: "7" }).fadeSeconds).toBe(2);
+  });
+
+  it("persists normalization and silence settings across restarts", () => {
+    const directory = mkdtempSync(join(tmpdir(), "pulse-quality-"));
+    const file = join(directory, "settings.json");
+    try {
+      const first = new GuildSettingsStore(file, 0);
+      first.update("gq:one", "gq", { normalize: true, trimStartSilence: true, fadeSeconds: 0 });
+      first.flush();
+      const next = new GuildSettingsStore(file, 0);
+      next.load();
+      expect(next.get("gq:one", "gq")).toMatchObject({
+        normalize: true,
+        trimStartSilence: true,
+        fadeSeconds: 0,
+      });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
