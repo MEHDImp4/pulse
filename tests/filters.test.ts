@@ -49,3 +49,45 @@ describe("buildFilterChain", () => {
     expect(buildFilterChain("off", undefined, 30)).toBeUndefined();
   });
 });
+
+describe("Audio quality options", () => {
+  it("can normalize a Bass Boost track without disabling the selected preset", () => {
+    const chain = buildFilterChain("bassboost", 160, 0, { normalize: true });
+    expect(chain).toContain("bass=g=5");
+    expect(chain).toContain("loudnorm=I=-16:TP=-1.5:LRA=11");
+    expect(chain?.match(/loudnorm=/g)).toHaveLength(1);
+  });
+
+  it("does not apply loudnorm twice when the preset already is Normalisation", () => {
+    const chain = buildFilterChain("loudnorm", 160, 0, { normalize: true });
+    expect(chain?.match(/loudnorm=/g)).toHaveLength(1);
+  });
+
+  it("trims only leading silence on fresh playback, never on seek", () => {
+    const fresh = buildFilterChain("off", 180, 0, { trimStartSilence: true });
+    const resumed = buildFilterChain("off", 180, 35, { trimStartSilence: true });
+    expect(fresh).toContain("silenceremove=start_periods=1");
+    expect(fresh).not.toContain("stop_periods");
+    expect(resumed).not.toContain("silenceremove");
+  });
+
+  it("allows fades to be disabled or customized", () => {
+    expect(buildFilterChain("off", 100, 0, { fadeSeconds: 0 })).toBeUndefined();
+    expect(buildFilterChain("off", 100, 0, { fadeSeconds: 4 }))
+      .toBe("afade=t=in:st=0:d=4,afade=t=out:st=96:d=4");
+    expect(buildFilterChain("off", 100, 0, { fadeSeconds: 42 })).toContain("d=5");
+  });
+
+  it("preserves the full-volume tail when a true crossfade might begin", () => {
+    const chain = buildFilterChain("off", 120, 0, { fadeSeconds: 2, skipFadeOut: true });
+    expect(chain).toContain("afade=t=in");
+    expect(chain).not.toContain("afade=t=out");
+  });
+
+  it("never adds a scheduled ending fade for unknown duration", () => {
+    const chain = buildFilterChain("off", undefined, 0, {
+      normalize: true, trimStartSilence: true, fadeSeconds: 2,
+    });
+    expect(chain).not.toContain("afade=t=out");
+  });
+});

@@ -175,7 +175,9 @@ describe("QueueAudioCache", () => {
     try {
       await untilCached(cache, quick);
       expect(cache.guildSnapshot("guild").ready).toBe(1);
-      expect(cache.globalSnapshot().activeDownloads).toBe(0);
+      // Publication du fichier et retrait du worker se font dans deux
+      // microtasks distinctes; attendre la fin effective du download.
+      await vi.waitFor(() => expect(cache.globalSnapshot().activeDownloads).toBe(0));
     } finally {
       release();
     }

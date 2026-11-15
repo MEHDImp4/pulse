@@ -17,6 +17,7 @@ import { playlist } from "./playlist";
 import { playnext } from "./playnext";
 import { previous } from "./previous";
 import { queue } from "./queue";
+import { quality } from "./quality";
 import { remove } from "./remove";
 import { resume } from "./resume";
 import { seek } from "./seek";
@@ -50,6 +51,7 @@ export const commands: CommandDefinition[] = [
   seek,
   stop,
   queue,
+  quality,
   nowplaying,
   lyrics,
   loop,

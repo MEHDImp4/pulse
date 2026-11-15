@@ -14,9 +14,10 @@ import {
 import type { Message, VoiceBasedChannel } from "discord.js";
 import { AudioPipeline, type AudioPipelineResult } from "../audio/AudioPipeline";
 import { NextTrackPreloader } from "../audio/NextTrackPreloader";
+import { planCrossfade, type CrossfadePlan } from "../audio/crossfade";
 import type { QueueAudioCache } from "../audio/QueueAudioCache";
 import { waitForAudioBuffer } from "../audio/preloadReady";
-import type { FilterPreset } from "../audio/filters";
+import { sanitizeFadeSeconds, type FilterPreset } from "../audio/filters";
 import { waitForStatus } from "../audio/playbackWatchdog";
 import { evaluateStall } from "../audio/stallWatchdog";
 import { percentToGain } from "../audio/volume";
@@ -86,7 +87,10 @@ export class GuildPlayer {
 
   private readonly pipeline: AudioPipeline;
   private readonly nextTrackPreloader: NextTrackPreloader<AudioPipelineResult>;
+  private readonly crossfadePreloader: NextTrackPreloader<AudioPipelineResult>;
   private preloadTimer?: NodeJS.Timeout;
+  private crossfadeTimer?: NodeJS.Timeout;
+  private crossfadePending = false;
   private connection?: VoiceConnection;
   private childProcesses: ChildProcess[] = [];
   private sourceCleanup?: () => void;
@@ -105,6 +109,10 @@ export class GuildPlayer {
   private _loopMode: LoopMode = "off";
   private _autoplay = false;
   private _filter: FilterPreset = "off";
+  private _normalize = false;
+  private _trimStartSilence = false;
+  private _fadeSeconds = 2;
+  private _crossfadeSeconds = 0;
   private _seekOffsetMs = 0;
   private suppressNextIdle = false;
   private startingTrack = false;
@@ -139,6 +147,12 @@ export class GuildPlayer {
       Math.max(45_000, env.preloadLeadSeconds * 1_000 + 10_000),
       (error) => logger.debug({ err: error, guild: this.guildId }, "Audio preload failed"),
     );
+    this.crossfadePreloader = new NextTrackPreloader<AudioPipelineResult>(
+      (prepared, signal) => waitForAudioBuffer(prepared.resource, env.preloadTimeoutMs, signal),
+      (prepared) => this.disposePreloadedAudio(prepared),
+      Math.max(45_000, env.preloadLeadSeconds * 1_000 + 10_000),
+      (error) => logger.debug({ err: error, guild: this.guildId }, "Crossfade preparation unavailable"),
+    );
     if (env.preloadNextTrack) {
       this.preloadTimer = setInterval(() => this.maybePreloadNext(), 2_000);
       this.preloadTimer.unref();
@@ -147,6 +161,11 @@ export class GuildPlayer {
     this._loopMode = initialSettings.loopMode;
     this._autoplay = initialSettings.autoplay;
     this._filter = initialSettings.filter;
+    this._normalize = initialSettings.normalize;
+    this._trimStartSilence = initialSettings.trimStartSilence;
+    this._fadeSeconds = initialSettings.fadeSeconds;
+    this._crossfadeSeconds = initialSettings.crossfadeSeconds;
+    this.updateCrossfadeTimer();
 
     this.audioPlayer.on(AudioPlayerStatus.Playing, () => {
       if (this.transitionStartedAt !== undefined && this._currentTrack) {
@@ -377,7 +396,32 @@ export class GuildPlayer {
   set filter(preset: FilterPreset) {
     this._filter = preset;
     this.onSettingsChange?.({ filter: preset });
+    this.nextTrackPreloader.cancel();
+    this.crossfadePreloader.cancel();
     this.maybePreloadNext();
+  }
+
+  get quality(): Pick<GuildSettings, "normalize" | "trimStartSilence" | "fadeSeconds" | "crossfadeSeconds"> {
+    return {
+      normalize: this._normalize,
+      trimStartSilence: this._trimStartSilence,
+      fadeSeconds: this._fadeSeconds,
+      crossfadeSeconds: this._crossfadeSeconds,
+    };
+  }
+
+  /** Quality changes are persisted atomically and invalidate mismatched standby audio. */
+  setQuality(patch: Partial<Pick<GuildSettings, "normalize" | "trimStartSilence" | "fadeSeconds" | "crossfadeSeconds">>): void {
+    if (patch.normalize !== undefined) this._normalize = patch.normalize === true;
+    if (patch.trimStartSilence !== undefined) this._trimStartSilence = patch.trimStartSilence === true;
+    if (patch.fadeSeconds !== undefined) this._fadeSeconds = sanitizeFadeSeconds(patch.fadeSeconds);
+    if (patch.crossfadeSeconds !== undefined) this._crossfadeSeconds = Number.isFinite(patch.crossfadeSeconds)
+      ? sanitizeFadeSeconds(patch.crossfadeSeconds) : 0;
+    this.onSettingsChange?.(this.quality);
+    this.nextTrackPreloader.cancel();
+    this.crossfadePreloader.cancel();
+    this.updateCrossfadeTimer();
+    this.notifyQueueChange();
   }
 
   /** Notifies the owner that the queue content changed (for persistence). */
@@ -391,38 +435,138 @@ export class GuildPlayer {
   }
 
   private preloadKey(track: Track, filter = this._filter): string {
-    return JSON.stringify([track.provider, track.id, track.webpageUrl, filter]);
+    return JSON.stringify([track.provider, track.id, track.webpageUrl, filter, this._normalize, this._trimStartSilence, this._fadeSeconds]);
   }
 
-  /** Warm only the immediate successor, shortly before the current track ends. */
+  private crossfadeKey(current: Track, next: Track): string {
+    return JSON.stringify([
+      this.preloadKey(current), this.preloadKey(next),
+      this._crossfadeSeconds, this._loopMode,
+    ]);
+  }
+
+  private updateCrossfadeTimer(): void {
+    if (this.crossfadeTimer) clearInterval(this.crossfadeTimer);
+    this.crossfadeTimer = undefined;
+    if (this._crossfadeSeconds > 0 && !this.destroyed) {
+      // 250ms cadence limits scheduling drift when the crossfade begins.
+      this.crossfadeTimer = setInterval(() => {
+        if (!env.preloadNextTrack) this.maybePreloadNext();
+        this.maybeActivateCrossfade();
+      }, 250);
+      this.crossfadeTimer.unref();
+    }
+  }
+
+  /** Schedule an actual two-song FFmpeg overlap only when both files are cached. */
   private maybePreloadNext(): void {
-    if (!env.preloadNextTrack || this.destroyed) return;
-    // Preserve the prepared pipeline while the serial queue is advancing after
-    // the Discord player entered Idle but before startTrack can claim it.
+    if ((!env.preloadNextTrack && this._crossfadeSeconds === 0) || this.destroyed) return;
+    // Do not discard prepared sources between Discord's Idle and next start.
     if (this.audioPlayer.state.status === AudioPlayerStatus.Idle && this._state === "PLAYING") return;
 
     const current = this._currentTrack;
     if (this._state !== "PLAYING" || !current || current.isLive || !current.duration || !this.currentResource) {
       this.nextTrackPreloader.cancel();
+      this.crossfadePreloader.cancel();
       return;
     }
 
-    const remaining = current.duration - (this.playbackElapsedMs ?? 0) / 1_000;
-    if (remaining > env.preloadLeadSeconds) {
-      this.nextTrackPreloader.cancel();
-      return;
-    }
     const next = peekNextTrack(current, this.queue.snapshot(), this._loopMode);
-    if (!next || next.isLive) {
+    const remaining = current.duration - (this.playbackElapsedMs ?? 0) / 1_000;
+    const plan = planCrossfade(
+      current, next, this._crossfadeSeconds, this._filter, this._trimStartSilence,
+    );
+    if (next && plan && remaining <= env.preloadLeadSeconds + plan.overlapSeconds
+        && remaining > plan.overlapSeconds - 1) {
+      const key = this.crossfadeKey(current, next);
+      this.crossfadePreloader.warm(key, async () => {
+        const result = await this.pipeline.createCrossfade(
+          current, next, plan, this._volume,
+          { normalize: this._normalize, fadeSeconds: 0 },
+        );
+        if (!result) throw new Error("Crossfade needs both songs already cached");
+        return result;
+      });
+    } else {
+      this.crossfadePreloader.cancel();
+    }
+
+    // Normal standby playback is still ready as fallback when overlap is not
+    // possible (live source, missing cache, outdated duration or manual skip).
+    if (!env.preloadNextTrack) {
       this.nextTrackPreloader.cancel();
       return;
     }
-
-    const filter = this._filter;
+    if (remaining > env.preloadLeadSeconds || !next || next.isLive) {
+      this.nextTrackPreloader.cancel();
+      return;
+    }
+    const options = {
+      filter: this._filter,
+      normalize: this._normalize,
+      trimStartSilence: this._trimStartSilence,
+      fadeSeconds: this._fadeSeconds,
+      skipFadeOut: this._crossfadeSeconds > 0 && this._filter === "off" && !this._trimStartSilence,
+    };
     this.nextTrackPreloader.warm(
-      this.preloadKey(next, filter),
-      () => this.pipeline.create(next, this._volume, { filter }),
+      this.preloadKey(next, options.filter),
+      () => this.pipeline.create(next, this._volume, options),
     );
+  }
+
+  /** Only performs the switch once FFmpeg's mixed audio is already buffered. */
+  private maybeActivateCrossfade(): void {
+    if (this.crossfadePending || this.destroyed || this._state !== "PLAYING") return;
+    const current = this._currentTrack;
+    const next = peekNextTrack(current, this.queue.snapshot(), this._loopMode);
+    const plan = planCrossfade(current, next, this._crossfadeSeconds, this._filter, this._trimStartSilence);
+    if (!current || !next || !plan) return;
+
+    const remaining = current.duration! - (this.playbackElapsedMs ?? 0) / 1_000;
+    // Never jump backwards into an old tail if Discord's playback timer
+    // drifted too far; let the existing normal auto-advance handle the song.
+    if (remaining > plan.overlapSeconds || remaining < plan.overlapSeconds - 0.65) return;
+    const key = this.crossfadeKey(current, next);
+    if (this.crossfadePreloader.key !== key) return;
+
+    this.crossfadePending = true;
+    void this.runExclusive(async () => {
+      if (this.destroyed || this._state !== "PLAYING" || this._currentTrack !== current) return;
+      const currentNext = peekNextTrack(current, this.queue.snapshot(), this._loopMode);
+      if (currentNext !== next || this.crossfadeKey(current, next) !== key) return;
+      const delay = current.duration! - (this.playbackElapsedMs ?? 0) / 1_000;
+      if (delay < plan.overlapSeconds - 0.8 || delay > plan.overlapSeconds) return;
+
+      const ready = await this.crossfadePreloader.take(key, 125);
+      if (!ready) return;
+      // The complete mixed stream is ready. Only now consume the queue.
+      const selected = decideNext(current, this._loopMode, this.queue);
+      if (!selected) {
+        await this.disposePreloadedAudio(ready);
+        return;
+      }
+
+      this.crossfadePreloader.cancel();
+      this.nextTrackPreloader.cancel();
+      this.pushHistory(current);
+      this.bypassLoop = false;
+      this.suppressNextIdle = true;
+      this.audioPlayer.stop(true);
+      try {
+        await this.startTrack(selected, 0, false, ready);
+        this.diagnostics.crossfadeUsed();
+        logger.info({
+          guild: this.guildId,
+          overlapSeconds: plan.overlapSeconds,
+        }, "Two-track cached crossfade started");
+      } catch (error) {
+        logger.warn({ err: error, guild: this.guildId }, "Crossfade failed; trying normal next track");
+        this._currentTrack = undefined;
+        await this.playNextInternal();
+      }
+    }).catch((error) => {
+      logger.warn({ err: error, guild: this.guildId }, "Crossfade transition failed");
+    }).finally(() => { this.crossfadePending = false; });
   }
 
   private async disposePreloadedAudio(prepared: AudioPipelineResult): Promise<void> {
@@ -772,6 +916,7 @@ export class GuildPlayer {
       this.autoplayCount = 0;
       this.clearAutoplayRetry();
       this.nextTrackPreloader.cancel();
+      this.crossfadePreloader.cancel();
       await this.killProcesses();
       this.audioPlayer.stop(true);
       this._state = "IDLE";
@@ -947,17 +1092,18 @@ export class GuildPlayer {
     if (this.history.length > 25) this.history.shift();
   }
 
-  private async startTrack(track: Track, startSeconds = 0, isRecovery = false): Promise<void> {
+  private async startTrack(track: Track, startSeconds = 0, isRecovery = false, crossfadeSource?: AudioPipelineResult): Promise<void> {
     if (!this.connection || this.connection.state.status !== VoiceConnectionStatus.Ready) {
       throw new Error("Voice connection is not ready");
     }
 
     // Claim the already-buffered next track before changing the current state,
     // which would otherwise invalidate the pending preload.
-    const preloaded = startSeconds === 0 && env.preloadNextTrack
+    const preloaded = crossfadeSource ?? (startSeconds === 0 && env.preloadNextTrack
       ? await this.nextTrackPreloader.take(this.preloadKey(track), env.preloadSwitchWaitMs)
-      : undefined;
+      : undefined);
     this.nextTrackPreloader.cancel();
+    this.crossfadePreloader.cancel();
 
     this.clearIdleTimer();
     this._state = "BUFFERING";
@@ -970,7 +1116,16 @@ export class GuildPlayer {
     this.rememberTrack(track);
     this.skipVotes.clear();
     try {
-      await this.killProcesses();
+      const previousCleanup = this.killProcesses();
+      if (crossfadeSource) {
+        // The mixed PCM is already primed; finish terminating the old
+        // process concurrently rather than introducing an audible pause.
+        void previousCleanup.catch((error) => {
+          logger.warn({ err: error, guild: this.guildId }, "Old source cleanup after crossfade failed");
+        });
+      } else {
+        await previousCleanup;
+      }
     } catch (error) {
       if (preloaded) await this.disposePreloadedAudio(preloaded);
       throw error;
@@ -989,6 +1144,10 @@ export class GuildPlayer {
             ? preloaded
             : await this.pipeline.create(track, this._volume, {
               filter: this._filter,
+              normalize: this._normalize,
+              trimStartSilence: this._trimStartSilence,
+              fadeSeconds: this._fadeSeconds,
+              skipFadeOut: this._crossfadeSeconds > 0 && this._filter === "off" && !this._trimStartSilence,
               startSeconds,
               useCache: attempt === 1,
             });
@@ -1106,6 +1265,9 @@ export class GuildPlayer {
     this.clearEmptyChannelTimer();
     this.clearAutoplayRetry();
     this.nextTrackPreloader.cancel();
+    this.crossfadePreloader.cancel();
+    if (this.crossfadeTimer) clearInterval(this.crossfadeTimer);
+    this.crossfadeTimer = undefined;
     if (this.preloadTimer) clearInterval(this.preloadTimer);
     this.preloadTimer = undefined;
     if (this.stallTimer) clearInterval(this.stallTimer);

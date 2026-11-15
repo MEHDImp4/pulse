@@ -154,6 +154,7 @@ This greatly reduces gaps for already-downloaded tracks, but cannot guarantee **
 | `/pause`, `/resume`, `/skip`, `/stop` | Playback controls |
 | `/playnext`, `/previous`, `/remove`, `/shuffle`, `/clear` | Manage the queue |
 | `/loop`, `/autoplay`, `/filter`, `/volume`, `/seek` | Customize playback |
+| `/quality [normalize] [trim_silence] [fade] [crossfade]` | Independent normalization, intro silence trimming, fades and optional crossfade |
 | `/favorite add`, `/favorite list`, `/favorite play` | Your personal favorites |
 | `/myplaylist save`, `/myplaylist list`, `/myplaylist load` | Save and replay your own playlists |
 | `/djrole add`, `/djrole remove`, `/djrole list` | Configure DJ roles (Manage Server required) |
@@ -165,6 +166,14 @@ This greatly reduces gaps for already-downloaded tracks, but cannot guarantee **
 For a complete list of options, use **`/help` in Discord**. A configured DJ role or the **Manage Server** permission is required for certain disruptive queue/playback controls. `/fairqueue` rearranges the existing queue **once**; it is not a continuously enabled scheduling mode.
 
 > The search menu is bound to the requesting user and voice channel and expires after two minutes. Your favorites and personal playlists are stored separately for each Discord user.
+
+### Audio quality and optional crossfade
+
+Use `/quality` to change settings **per voice channel**: `normalize:true` enables FFmpeg loudness normalization independently of Bass Boost or other effects, `trim_silence:true` removes **leading** silent segments only (never pauses mid-song), and `fade:0..5` controls short track-boundary fades. All options persist per voice session and can be turned off. **Normalization and silence trimming default to off** to preserve the original sound, while the existing fade remains **2 seconds** by default.
+
+`/quality crossfade:3` opts into a **real three-second audio overlap**: for non-live tracks with known durations, once **both songs are fully cached**, FFmpeg blends the previous song's tail with the next song's opening before continuing playback of the next song. Crossfade is **disabled by default**; it requires the `off` preset and silence trimming disabled. Missing audio, changed queue order, unusual timing or failed preparation falls back to normal standby playback. Manual `/skip` and `/seek` retain their original behavior.
+
+Crossfade intentionally overlaps song boundaries; inaccurate track durations can affect timing. Start with `crossfade:2` or `crossfade:3` on a short playlist with cached tracks. Normalization and trimming may add some CPU overhead.
 
 ## Optional web dashboard
 

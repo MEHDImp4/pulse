@@ -5,7 +5,8 @@ import type { QueueAudioCache } from "./QueueAudioCache";
 import type { Track } from "../music/Track";
 import type { AudioProvider } from "../providers/AudioProvider";
 import { logger } from "../utils/logger";
-import { buildFilterChain, type FilterPreset } from "./filters";
+import { buildFilterChain, type FilterPreset, type AudioQualityOptions } from "./filters";
+import { buildCrossfadeGraph, type CrossfadePlan } from "./crossfade";
 import { percentToGain } from "./volume";
 
 const URL_PATTERN = /https?:\/\/\S+/gi;
@@ -22,7 +23,7 @@ export interface AudioPipelineResult {
   fromCache?: boolean;
 }
 
-export interface AudioPipelineOptions {
+export interface AudioPipelineOptions extends AudioQualityOptions {
   filter?: FilterPreset;
   startSeconds?: number;
   useCache?: boolean;
@@ -30,6 +31,56 @@ export interface AudioPipelineOptions {
 
 export class AudioPipeline {
   constructor(private readonly provider: AudioProvider, private readonly cache?: QueueAudioCache) {}
+
+  /**
+   * Prepare a real two-input mix of A's last seconds and B's beginning.
+   * Requires complete local audio for BOTH tracks; returns undefined when
+   * unavailable so GuildPlayer can use its existing safe transition path.
+   */
+  async createCrossfade(
+    current: Track,
+    next: Track,
+    plan: CrossfadePlan,
+    volume: number,
+    options: AudioQualityOptions = {},
+  ): Promise<AudioPipelineResult | undefined> {
+    if (!this.cache || current.isLive || next.isLive || !next.duration) return undefined;
+    const [currentPath, nextPath] = await Promise.all([
+      this.cache.pathFor(current),
+      this.cache.pathFor(next),
+    ]);
+    if (!currentPath || !nextPath) return undefined;
+
+    const ffmpeg = spawn(env.ffmpegPath, [
+      "-hide_banner", "-loglevel", "warning", "-nostdin",
+      "-ss", String(plan.startAtSeconds), "-i", currentPath,
+      "-i", nextPath,
+      "-filter_complex", buildCrossfadeGraph(
+        plan, next.duration, options.normalize, options.fadeSeconds,
+      ),
+      "-map", "[out]",
+      "-vn", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
+    ], {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: false,
+      windowsHide: true,
+    });
+
+    ffmpeg.stderr.on("data", (chunk: Buffer) => {
+      logger.debug({ track: next.title, ffmpeg: redactUrls(chunk.toString("utf8").slice(-1_000)) }, "Crossfade FFmpeg stderr");
+    });
+    ffmpeg.on("error", (error) => {
+      logger.warn({ err: error, guildTrack: next.id }, "Crossfade FFmpeg failed");
+    });
+
+    const resource = createAudioResource(ffmpeg.stdout, {
+      inputType: StreamType.Raw,
+      metadata: next,
+      inlineVolume: true,
+    });
+    resource.volume?.setVolume(percentToGain(volume, env.volumeHeadroomDb, env.volumeRangeDb));
+    return { processes: [ffmpeg], resource, fromCache: true };
+  }
 
   async create(
     track: Track,
@@ -45,6 +96,12 @@ export class AudioPipeline {
       options.filter ?? "off",
       isLive ? undefined : track.duration,
       startSeconds,
+      {
+        normalize: options.normalize,
+        trimStartSilence: !isLive && options.trimStartSilence,
+        fadeSeconds: options.fadeSeconds,
+        skipFadeOut: options.skipFadeOut,
+      },
     );
 
     const args = ["-hide_banner", "-loglevel", "warning", "-nostdin"];

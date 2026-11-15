@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { isFilterPreset, type FilterPreset } from "../audio/filters";
+import { isFilterPreset, sanitizeFadeSeconds, type FilterPreset } from "../audio/filters";
 import { env } from "../config/env";
 import { logger } from "../utils/logger";
 import type { LoopMode } from "./GuildPlayer";
@@ -10,6 +10,11 @@ export interface GuildSettings {
   loopMode: LoopMode;
   autoplay: boolean;
   filter: FilterPreset;
+  normalize: boolean;
+  trimStartSilence: boolean;
+  fadeSeconds: number;
+  /** Optional overlap between two cached tracks; disabled by default. */
+  crossfadeSeconds: number;
 }
 
 export const DEFAULT_GUILD_SETTINGS: GuildSettings = {
@@ -17,6 +22,10 @@ export const DEFAULT_GUILD_SETTINGS: GuildSettings = {
   loopMode: "off",
   autoplay: env.autoplayDefault,
   filter: "off",
+  normalize: false,
+  trimStartSilence: false,
+  fadeSeconds: 2,
+  crossfadeSeconds: 0,
 };
 
 export const LOOP_MODES: readonly LoopMode[] = ["off", "track", "queue"];
@@ -37,8 +46,15 @@ export function sanitizeSettings(input: unknown): GuildSettings {
     typeof raw.autoplay === "boolean" ? raw.autoplay : DEFAULT_GUILD_SETTINGS.autoplay;
 
   const filter = isFilterPreset(raw.filter) ? raw.filter : DEFAULT_GUILD_SETTINGS.filter;
+  const normalize = typeof raw.normalize === "boolean" ? raw.normalize : DEFAULT_GUILD_SETTINGS.normalize;
+  const trimStartSilence = typeof raw.trimStartSilence === "boolean"
+    ? raw.trimStartSilence : DEFAULT_GUILD_SETTINGS.trimStartSilence;
+  const fadeSeconds = sanitizeFadeSeconds(raw.fadeSeconds);
+  const crossfadeSeconds = typeof raw.crossfadeSeconds === "number" && Number.isFinite(raw.crossfadeSeconds)
+    ? sanitizeFadeSeconds(raw.crossfadeSeconds)
+    : DEFAULT_GUILD_SETTINGS.crossfadeSeconds;
 
-  return { volume, loopMode, autoplay, filter };
+  return { volume, loopMode, autoplay, filter, normalize, trimStartSilence, fadeSeconds, crossfadeSeconds };
 }
 
 export function mergeSettings(base: GuildSettings, patch: Partial<GuildSettings>): GuildSettings {
