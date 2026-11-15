@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createAudioResource, StreamType, type AudioResource } from "@discordjs/voice";
 import { env } from "../config/env";
+import type { QueueAudioCache } from "./QueueAudioCache";
 import type { Track } from "../music/Track";
 import type { AudioProvider } from "../providers/AudioProvider";
 import { logger } from "../utils/logger";
@@ -18,22 +19,25 @@ export interface AudioPipelineResult {
   processes: ChildProcess[];
   resource: AudioResource<Track>;
   cleanup?: () => void;
+  fromCache?: boolean;
 }
 
 export interface AudioPipelineOptions {
   filter?: FilterPreset;
   startSeconds?: number;
+  useCache?: boolean;
 }
 
 export class AudioPipeline {
-  constructor(private readonly provider: AudioProvider) {}
+  constructor(private readonly provider: AudioProvider, private readonly cache?: QueueAudioCache) {}
 
   async create(
     track: Track,
     volume = 100,
     options: AudioPipelineOptions = {},
   ): Promise<AudioPipelineResult> {
-    const source = await this.provider.createSource(track);
+    const cachedPath = options.useCache === false ? undefined : await this.cache?.pathFor(track);
+    const source = cachedPath ? undefined : await this.provider.createSource(track);
 
     const isLive = track.isLive === true;
     const startSeconds = isLive ? 0 : Math.max(0, options.startSeconds ?? 0);
@@ -44,7 +48,9 @@ export class AudioPipeline {
     );
 
     const args = ["-hide_banner", "-loglevel", "warning", "-nostdin"];
-    if (source.kind === "url") {
+    if (cachedPath) {
+      args.push("-i", cachedPath);
+    } else if (source?.kind === "url") {
       args.push(
         "-reconnect", "1",
         "-reconnect_streamed", "1",
@@ -72,7 +78,7 @@ export class AudioPipeline {
 
     const processes: ChildProcess[] = [];
 
-    if (source.kind === "pipe" || source.kind === "stream") {
+    if (source?.kind === "pipe" || source?.kind === "stream") {
       source.stream.pipe(ffmpeg.stdin);
       source.stream.on("error", (error) => {
         logger.error({ err: error, track: track.title }, "Source stream error");
@@ -128,7 +134,8 @@ export class AudioPipeline {
     return {
       processes,
       resource,
-      cleanup: source.kind === "stream" ? source.close : undefined,
+      cleanup: source?.kind === "stream" ? source.close : undefined,
+      fromCache: cachedPath !== undefined,
     };
   }
 }
