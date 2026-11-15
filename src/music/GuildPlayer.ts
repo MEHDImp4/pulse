@@ -415,7 +415,8 @@ export class GuildPlayer {
     if (patch.normalize !== undefined) this._normalize = patch.normalize === true;
     if (patch.trimStartSilence !== undefined) this._trimStartSilence = patch.trimStartSilence === true;
     if (patch.fadeSeconds !== undefined) this._fadeSeconds = sanitizeFadeSeconds(patch.fadeSeconds);
-    if (patch.crossfadeSeconds !== undefined) this._crossfadeSeconds = sanitizeFadeSeconds(patch.crossfadeSeconds);
+    if (patch.crossfadeSeconds !== undefined) this._crossfadeSeconds = Number.isFinite(patch.crossfadeSeconds)
+      ? sanitizeFadeSeconds(patch.crossfadeSeconds) : 0;
     this.onSettingsChange?.(this.quality);
     this.nextTrackPreloader.cancel();
     this.crossfadePreloader.cancel();
