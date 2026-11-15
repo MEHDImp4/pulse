@@ -689,7 +689,16 @@ export class GuildPlayer {
     return this.runExclusive(async () => {
       if (!this._currentTrack) return false;
       this.bypassLoop = true;
-      await this.killProcesses();
+      const oldCleanup = this.killProcesses();
+      if (this.nextTrackPreloader.key) {
+        // The next Opus stream is ready: begin the switch while the old
+        // process terminates, rather than making listeners wait for its exit.
+        void oldCleanup.catch((error) => {
+          logger.warn({ err: error, guild: this.guildId }, "Skipped audio process cleanup failed");
+        });
+        return this.audioPlayer.stop(true);
+      }
+      await oldCleanup;
       return this.audioPlayer.stop(true);
     });
   }
