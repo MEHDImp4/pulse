@@ -13,6 +13,8 @@ export interface GuildSettings {
   normalize: boolean;
   trimStartSilence: boolean;
   fadeSeconds: number;
+  /** Optional overlap between two cached tracks; disabled by default. */
+  crossfadeSeconds: number;
 }
 
 export const DEFAULT_GUILD_SETTINGS: GuildSettings = {
@@ -23,6 +25,7 @@ export const DEFAULT_GUILD_SETTINGS: GuildSettings = {
   normalize: false,
   trimStartSilence: false,
   fadeSeconds: 2,
+  crossfadeSeconds: 0,
 };
 
 export const LOOP_MODES: readonly LoopMode[] = ["off", "track", "queue"];
@@ -47,8 +50,10 @@ export function sanitizeSettings(input: unknown): GuildSettings {
   const trimStartSilence = typeof raw.trimStartSilence === "boolean"
     ? raw.trimStartSilence : DEFAULT_GUILD_SETTINGS.trimStartSilence;
   const fadeSeconds = sanitizeFadeSeconds(raw.fadeSeconds);
+  const crossfadeSeconds = raw.crossfadeSeconds === undefined
+    ? DEFAULT_GUILD_SETTINGS.crossfadeSeconds : sanitizeFadeSeconds(raw.crossfadeSeconds);
 
-  return { volume, loopMode, autoplay, filter, normalize, trimStartSilence, fadeSeconds };
+  return { volume, loopMode, autoplay, filter, normalize, trimStartSilence, fadeSeconds, crossfadeSeconds };
 }
 
 export function mergeSettings(base: GuildSettings, patch: Partial<GuildSettings>): GuildSettings {
