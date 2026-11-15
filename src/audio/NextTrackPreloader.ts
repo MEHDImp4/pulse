@@ -15,7 +15,6 @@ export class NextTrackPreloader<T> {
   };
 
   constructor(
-    private readonly prepare: (key: string) => Promise<T>,
     private readonly waitUntilReady: (value: T, signal: AbortSignal) => Promise<void>,
     private readonly dispose: (value: T) => Promise<void>,
     private readonly maxAgeMs = 45_000,
@@ -26,7 +25,7 @@ export class NextTrackPreloader<T> {
     return this.job?.key;
   }
 
-  warm(key: string): void {
+  warm(key: string, prepare: () => Promise<T>): void {
     if (this.job?.key === key && Date.now() - this.job.startedAt < this.maxAgeMs) return;
     this.cancel();
 
@@ -42,7 +41,7 @@ export class NextTrackPreloader<T> {
     job.promise = (async () => {
       let value: T | undefined;
       try {
-        value = await this.prepare(key);
+        value = await prepare();
         if (job.cancelled) {
           await this.dispose(value);
           return undefined;
