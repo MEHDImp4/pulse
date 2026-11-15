@@ -197,7 +197,7 @@ les files d'attente, le Party Mode, le cache audio et les statistiques.
 2. Choisir le **Dashboard - Port Web (Unraid)** : `8090` par défaut,
    ou un autre port libre (`8095` par exemple).
 3. Définir un **mot de passe local** unique d'au moins 12 caractères,
-   puis cliquer sur **Apply**.
+   garder le mode avancé `auto` (ou `local` si d'anciens secrets OAuth restent configurés), puis cliquer sur **Apply**.
 4. Ouvrir le bouton **WebUI** du conteneur ou
    `http://IP_UNRAID:PORT_CHOISI`, puis entrer le mot de passe.
 
