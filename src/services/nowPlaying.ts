@@ -1,3 +1,4 @@
+import type { ChatInputCommandInteraction, StringSelectMenuInteraction } from "discord.js";
 import type { GuildPlayer } from "../music/GuildPlayer";
 import type { PlayerManager } from "../music/PlayerManager";
 import { playbackControlsRows } from "../ui/controls";
@@ -69,6 +70,39 @@ function buildPayload(player: GuildPlayer): {
     embeds: [nowPlayingEmbed(player)],
     components: playbackControlsRows(player.channelId, player.state === "PAUSED"),
   };
+}
+
+/**
+ * Publish a public, persistent music panel independently of the slash-command
+ * response. Reuse the live card instead of accumulating one per /play.
+ */
+export async function publishNowPlaying(
+  interaction: ChatInputCommandInteraction | StringSelectMenuInteraction,
+  player: GuildPlayer,
+): Promise<void> {
+  const existing = player.nowPlayingMessage;
+  if (existing) {
+    try {
+      await existing.edit(buildPayload(player));
+      player.setNowPlayingMessage(existing);
+      lastSignatures.delete(player.sessionId);
+      return;
+    } catch (error) {
+      logger.debug({ err: error, guild: player.guildId }, "Unable to reuse existing now-playing card");
+    }
+  }
+
+  const channel = interaction.channel;
+  if (!channel?.isSendable()) {
+    throw new Error("Je ne peux pas envoyer le panneau musical dans ce salon.");
+  }
+
+  const message = await channel.send({
+    ...buildPayload(player),
+    allowedMentions: { parse: [] },
+  });
+  player.setNowPlayingMessage(message);
+  lastSignatures.delete(player.sessionId);
 }
 
 /** Immediately re-renders the live now-playing panel (e.g. after a volume change). */
