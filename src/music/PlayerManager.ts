@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { Client } from "discord.js";
 import { env } from "../config/env";
+import { QueueAudioCache } from "../audio/QueueAudioCache";
 import type { AudioProvider, PlaylistResult } from "../providers/AudioProvider";
 import { isPlaylistUrl } from "../providers/youtube";
 import { playbackControlsRows } from "../ui/controls";
@@ -33,6 +34,7 @@ export class PlayerManager {
   private readonly playbackWaiters = new Map<string, PlaybackWaiter[]>();
   private readonly settings: GuildSettingsStore;
   private readonly queueStore?: QueueStore;
+  private readonly audioCache?: QueueAudioCache;
 
   constructor(
     private readonly provider: AudioProvider,
@@ -40,6 +42,15 @@ export class PlayerManager {
   ) {
     this.settings = new GuildSettingsStore(join(env.dataDir, "guild-settings.json"));
     this.settings.load();
+
+    if (env.cacheQueueAudio && env.queueCacheMaxMb > 0) {
+      this.audioCache = new QueueAudioCache(provider, join(env.dataDir, "audio-cache"), {
+        maxBytes: env.queueCacheMaxMb * 1024 * 1024,
+        maxTrackBytes: env.queueCacheTrackMaxMb * 1024 * 1024,
+        concurrency: env.queueCacheConcurrency,
+        downloadTimeoutMs: env.queueCacheDownloadTimeoutMs,
+      });
+    }
 
     if (env.queuePersist) {
       this.queueStore = new QueueStore(join(env.dataDir, "queues.json"), env.queuePersistDebounceMs);
@@ -210,7 +221,10 @@ export class PlayerManager {
           this.players.delete(id);
           const inGuild = this.playersByGuild.get(guildId);
           inGuild?.delete(player);
-          if (inGuild?.size === 0) this.playersByGuild.delete(guildId);
+          if (inGuild?.size === 0) {
+            this.playersByGuild.delete(guildId);
+            this.audioCache?.forgetGuild(guildId);
+          }
         }
       },
       (textChannelId, content) => {
@@ -222,8 +236,10 @@ export class PlayerManager {
       },
       (changed) => {
         this.persistQueue(changed);
+        this.audioCache?.setQueue(guildId, changed.queue.snapshot());
       },
       (seed, exclude) => this.autoplayRelated(seed, exclude),
+      this.audioCache,
     );
     this.players.set(sessionId, player);
     let inGuild = this.playersByGuild.get(guildId);
@@ -233,6 +249,7 @@ export class PlayerManager {
     }
     inGuild.add(player);
     this.restoreQueue(player);
+    this.audioCache?.setQueue(guildId, player.queue.snapshot());
     return player;
   }
 
@@ -375,6 +392,7 @@ export class PlayerManager {
   }
 
   async destroyAll(): Promise<void> {
+    this.audioCache?.close();
     await Promise.all([...this.players.values()].map((player) => player.destroy()));
     this.players.clear();
     this.playersByGuild.clear();

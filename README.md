@@ -135,6 +135,12 @@ Join a voice channel first, then try `/play`. Most actions work as native Discor
 
 Music commands (`/play`, `/playnext`, `/playlist`) use **private, short-lived confirmations** (controlled by `AUTO_DELETE_SECONDS`, default 1 second). The shared **Now Playing** card is posted separately, stays interactive, and is updated instead of creating duplicate cards. Pulse needs **Send Messages** and **Embed Links** permissions in the text channel.
 
+
+
+**Whole-queue caching (new):** Pulse progressively downloads **every supported pending track**, not just the immediately next song, storing compressed audio in `DATA_DIR/audio-cache`. Earlier queued tracks get priority. A **1 GB global disk budget** is shared across Discord guilds, with **two concurrent downloads** and a **64 MB per-track limit**. Completed downloads survive restarts, with low-priority items evicted as the cache fills. Live radio and unsupported streams are never cached. The existing just-in-time next-track Opus preparation still handles the final transition. Settings: `CACHE_QUEUE_AUDIO`, `QUEUE_CACHE_MAX_MB`, `QUEUE_CACHE_TRACK_MAX_MB`, `QUEUE_CACHE_CONCURRENCY`, `QUEUE_CACHE_DOWNLOAD_TIMEOUT_MS`.
+
+This greatly reduces gaps for already-downloaded tracks, but cannot guarantee **zero interruptions** if downloads are incomplete, the network is slow, a source is restricted or disk space is exhausted. Enabling it increases network and disk usage.
+
 **Faster track transitions:** when the current song has a known duration and the next queue track exists, Pulse warms its audio stream **25 seconds before the end**. At most one next track is prepared per server, with process cleanup on queue changes, stops and failures. Preloading cannot guarantee zero silence with slow sources or unknown-duration tracks. Docker/Unraid settings: `PRELOAD_NEXT_TRACK`, `PRELOAD_LEAD_SECONDS`, `PRELOAD_TIMEOUT_MS`, and `PRELOAD_SWITCH_WAIT_MS`.
 
 | Command | What it does |

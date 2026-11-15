@@ -136,6 +136,12 @@ Rejoins un salon vocal, puis utilise `/play` pour lancer une musique. Les comman
 
 Les commandes de lecture (`/play`, `/playnext`, `/playlist`) utilisent des confirmations **privées et temporaires** (durée réglée par `AUTO_DELETE_SECONDS`, 1 seconde par défaut). Le panneau **Lecture en cours** est envoyé séparément dans le salon, reste accessible à tous avec ses boutons et est réutilisé au lieu d'être dupliqué. Pulse doit avoir les permissions **Envoyer des messages** et **Intégrer des liens** dans ce salon.
 
+
+
+**Cache de toute la file (nouveau) :** Pulse télécharge progressivement **tous les titres compatibles en attente**, pas seulement le prochain, en conservant l'audio compressé dans `DATA_DIR/audio-cache`. Les morceaux prioritaires sont ceux proches du début de la file. Un cache disque **global de 1 Go** est partagé entre les serveurs, avec **deux téléchargements simultanés** et **64 Mo maximum par titre**. Les titres déjà téléchargés sont réutilisés après un redémarrage ; le cache élimine les éléments moins prioritaires lorsqu'il atteint sa limite. Les flux radio en direct et les pistes non compatibles ne sont pas téléchargés. Le préchargement audio de la prochaine piste reste actif pour éviter le délai de décodage à la transition. Options : `CACHE_QUEUE_AUDIO`, `QUEUE_CACHE_MAX_MB`, `QUEUE_CACHE_TRACK_MAX_MB`, `QUEUE_CACHE_CONCURRENCY`, `QUEUE_CACHE_DOWNLOAD_TIMEOUT_MS`.
+
+Le cache accélère fortement les transitions pour les titres entièrement téléchargés, mais ne peut pas garantir **zéro interruption** : le réseau, un téléchargement inachevé, les restrictions d'une source ou un disque plein peuvent encore entraîner une attente. L'activation implique du trafic réseau et l'utilisation de l'espace disque configuré.
+
 **Transitions musicales plus rapides :** lorsqu’un morceau possède une durée connue et qu’un suivant est en attente, Pulse commence à préparer son flux audio **25 secondes avant la fin**. Une seule piste est préchargée par serveur ; les flux abandonnés sont arrêtés automatiquement si la file est modifiée, si la lecture est interrompue ou si une préparation échoue. Le préchargement ne garantit pas zéro silence en cas de réseau lent ou de piste sans durée connue. Options Docker/Unraid : `PRELOAD_NEXT_TRACK`, `PRELOAD_LEAD_SECONDS`, `PRELOAD_TIMEOUT_MS` et `PRELOAD_SWITCH_WAIT_MS`.
 
 | Commande | Fonction |
