@@ -5,7 +5,7 @@ import type { QueueAudioCache } from "./QueueAudioCache";
 import type { Track } from "../music/Track";
 import type { AudioProvider } from "../providers/AudioProvider";
 import { logger } from "../utils/logger";
-import { buildFilterChain, type FilterPreset } from "./filters";
+import { buildFilterChain, type FilterPreset, type AudioQualityOptions } from "./filters";
 import { percentToGain } from "./volume";
 
 const URL_PATTERN = /https?:\/\/\S+/gi;
@@ -22,7 +22,7 @@ export interface AudioPipelineResult {
   fromCache?: boolean;
 }
 
-export interface AudioPipelineOptions {
+export interface AudioPipelineOptions extends AudioQualityOptions {
   filter?: FilterPreset;
   startSeconds?: number;
   useCache?: boolean;
@@ -45,6 +45,11 @@ export class AudioPipeline {
       options.filter ?? "off",
       isLive ? undefined : track.duration,
       startSeconds,
+      {
+        normalize: options.normalize,
+        trimStartSilence: !isLive && options.trimStartSilence,
+        fadeSeconds: options.fadeSeconds,
+      },
     );
 
     const args = ["-hide_banner", "-loglevel", "warning", "-nostdin"];
