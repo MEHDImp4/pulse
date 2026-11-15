@@ -153,6 +153,15 @@ describe("audio quality settings", () => {
     expect(sanitizeSettings({ crossfadeSeconds: -4 }).crossfadeSeconds).toBe(0);
     expect(sanitizeSettings({ crossfadeSeconds: "3" }).crossfadeSeconds).toBe(0);
     expect(DEFAULT_GUILD_SETTINGS.crossfadeSeconds).toBe(0);
+    expect(DEFAULT_GUILD_SETTINGS.partyMode).toBe(false);
+    expect(DEFAULT_GUILD_SETTINGS.partyMaxPerUser).toBe(3);
+    expect(sanitizeSettings({ partyMode: "true", partyMaxPerUser: "10" })).toMatchObject({
+      partyMode: false, partyMaxPerUser: 3,
+    });
+    expect(sanitizeSettings({ partyMode: true, partyMaxPerUser: 100 })).toMatchObject({
+      partyMode: true, partyMaxPerUser: 10,
+    });
+    expect(sanitizeSettings({ partyMaxPerUser: -9 }).partyMaxPerUser).toBe(1);
   });
 
   it("persists normalization and silence settings across restarts", () => {
@@ -160,7 +169,7 @@ describe("audio quality settings", () => {
     const file = join(directory, "settings.json");
     try {
       const first = new GuildSettingsStore(file, 0);
-      first.update("gq:one", "gq", { normalize: true, trimStartSilence: true, fadeSeconds: 0, crossfadeSeconds: 3 });
+      first.update("gq:one", "gq", { normalize: true, trimStartSilence: true, fadeSeconds: 0, crossfadeSeconds: 3, partyMode: true, partyMaxPerUser: 4 });
       first.flush();
       const next = new GuildSettingsStore(file, 0);
       next.load();
@@ -169,6 +178,8 @@ describe("audio quality settings", () => {
         trimStartSilence: true,
         fadeSeconds: 0,
         crossfadeSeconds: 3,
+        partyMode: true,
+        partyMaxPerUser: 4,
       });
     } finally {
       rmSync(directory, { recursive: true, force: true });
