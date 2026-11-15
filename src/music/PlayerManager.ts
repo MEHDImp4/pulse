@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { Client } from "discord.js";
 import { env } from "../config/env";
-import { QueueAudioCache } from "../audio/QueueAudioCache";
+import { QueueAudioCache, type GuildCacheSnapshot } from "../audio/QueueAudioCache";
 import type { AudioProvider, PlaylistResult } from "../providers/AudioProvider";
 import { isPlaylistUrl } from "../providers/youtube";
 import { playbackControlsRows } from "../ui/controls";
@@ -460,6 +460,11 @@ export class PlayerManager {
     }
 
     return track;
+  }
+
+  /** Only the caller's guild cache progress, never another guild's song list. */
+  cacheForGuild(guildId: string): GuildCacheSnapshot | undefined {
+    return this.audioCache?.guildSnapshot(guildId);
   }
 
   get size(): number {
