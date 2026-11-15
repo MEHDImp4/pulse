@@ -159,6 +159,7 @@ This greatly reduces gaps for already-downloaded tracks, but cannot guarantee **
 | `/myplaylist save`, `/myplaylist list`, `/myplaylist load` | Save and replay your own playlists |
 | `/djrole add`, `/djrole remove`, `/djrole list` | Configure DJ roles (Manage Server required) |
 | `/fairqueue` | Rotate queued requests fairly between users |
+| `/party [mode:on|off] [limite:1..10]` | Persistent Party Mode with a per-user pending-song cap |
 | `/voteskip` | Vote to skip a track |
 | `/lyrics` | Look up lyrics when available |
 | `/status`, `/testaudio`, `/help`, `/leave` | Diagnostics, help and voice management |
@@ -174,6 +175,14 @@ Use `/quality` to change settings **per voice channel**: `normalize:true` enable
 `/quality crossfade:3` opts into a **real three-second audio overlap**: for non-live tracks with known durations, once **both songs are fully cached**, FFmpeg blends the previous song's tail with the next song's opening before continuing playback of the next song. Crossfade is **disabled by default**; it requires the `off` preset and silence trimming disabled. Missing audio, changed queue order, unusual timing or failed preparation falls back to normal standby playback. Manual `/skip` and `/seek` retain their original behavior.
 
 Crossfade intentionally overlaps song boundaries; inaccurate track durations can affect timing. Start with `crossfade:2` or `crossfade:3` on a short playlist with cached tracks. Normalization and trimming may add some CPU overhead.
+
+### Persistent Party Mode and interactive queue
+
+`/party mode:on` enables continuous round-robin fairness whenever tracks are added, removed or played. Each user may have **3 pending songs by default**; change this with `/party limite:5` (1–10). Already queued tracks are preserved and reordered; the cap applies only to future additions. Only DJ-authorized members can change Party Mode. `/party mode:off` restores ordinary manual queue ordering.
+
+`/queue` now includes a **track selector** on every page. DJs in the bot's voice channel can move the selected track up/down or remove it using private buttons. Stale selections are rejected, and manual reordering is disabled while Party Mode is active.
+
+The optional OAuth2 dashboard can toggle Party Mode, configure the per-user cap and show guild-scoped cache readiness, concurrent downloads and audio-transition statistics. Existing permission and CSRF checks remain in force.
 
 ## Optional web dashboard
 
