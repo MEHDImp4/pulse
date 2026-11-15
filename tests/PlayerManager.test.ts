@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { RequestedBy, Track } from "../src/music/Track";
 import type { AudioProvider, AudioSource } from "../src/providers/AudioProvider";
 import { PlayerManager } from "../src/music/PlayerManager";
@@ -34,6 +34,72 @@ describe("PlayerManager", () => {
     release?.(); // idempotent
     expect(manager.reservePlaybackStart("guild-a", "chan-2")).toBeTypeOf("function");
     other?.();
+  });
+
+  it("admits simultaneous commands FIFO within one guild", async () => {
+    const manager = new PlayerManager(new StubProvider());
+    const first = await manager.waitForPlaybackStart("guild-a", "chan-1");
+    expect(first.status).toBe("ok");
+    if (first.status !== "ok") return;
+
+    const order: number[] = [];
+    const second = manager.waitForPlaybackStart("guild-a", "chan-1").then((result) => {
+      order.push(2);
+      return result;
+    });
+    const third = manager.waitForPlaybackStart("guild-a", "chan-1").then((result) => {
+      order.push(3);
+      return result;
+    });
+    const otherGuild = await manager.waitForPlaybackStart("guild-b", "chan-2");
+    expect(otherGuild.status).toBe("ok");
+
+    first.release();
+    const next = await second;
+    expect(next.status).toBe("ok");
+    expect(order).toEqual([2]);
+    if (next.status !== "ok") return;
+
+    next.release();
+    const last = await third;
+    expect(last.status).toBe("ok");
+    expect(order).toEqual([2, 3]);
+    if (last.status === "ok") last.release();
+    if (otherGuild.status === "ok") otherGuild.release();
+  });
+
+  it("drops timed-out waiters and does not leave a guild locked", async () => {
+    vi.useFakeTimers();
+    try {
+      const manager = new PlayerManager(new StubProvider());
+      const first = await manager.waitForPlaybackStart("guild-a", "chan-1");
+      expect(first.status).toBe("ok");
+      const timedOut = manager.waitForPlaybackStart("guild-a", "chan-1");
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect((await timedOut).status).toBe("timeout");
+      if (first.status !== "ok") return;
+      first.release();
+      const retry = await manager.waitForPlaybackStart("guild-a", "chan-1");
+      expect(retry.status).toBe("ok");
+      if (retry.status === "ok") retry.release();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bounds queued playback requests instead of allowing unlimited load", async () => {
+    vi.useFakeTimers();
+    try {
+      const manager = new PlayerManager(new StubProvider());
+      const first = await manager.waitForPlaybackStart("guild-a", "chan-1");
+      const queued = Array.from({ length: 12 }, () => manager.waitForPlaybackStart("guild-a", "chan-1"));
+      expect((await manager.waitForPlaybackStart("guild-a", "chan-1")).status).toBe("busy");
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect((await Promise.all(queued)).map((result) => result.status)).toEqual(Array(12).fill("timeout"));
+      if (first.status === "ok") first.release();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns one player per guild+channel and isolates sessions", () => {
