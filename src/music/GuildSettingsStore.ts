@@ -50,8 +50,9 @@ export function sanitizeSettings(input: unknown): GuildSettings {
   const trimStartSilence = typeof raw.trimStartSilence === "boolean"
     ? raw.trimStartSilence : DEFAULT_GUILD_SETTINGS.trimStartSilence;
   const fadeSeconds = sanitizeFadeSeconds(raw.fadeSeconds);
-  const crossfadeSeconds = raw.crossfadeSeconds === undefined
-    ? DEFAULT_GUILD_SETTINGS.crossfadeSeconds : sanitizeFadeSeconds(raw.crossfadeSeconds);
+  const crossfadeSeconds = typeof raw.crossfadeSeconds === "number" && Number.isFinite(raw.crossfadeSeconds)
+    ? sanitizeFadeSeconds(raw.crossfadeSeconds)
+    : DEFAULT_GUILD_SETTINGS.crossfadeSeconds;
 
   return { volume, loopMode, autoplay, filter, normalize, trimStartSilence, fadeSeconds, crossfadeSeconds };
 }
