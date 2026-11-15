@@ -39,6 +39,19 @@ function sponsorblockModeEnv(name: string, fallback: SponsorblockMode): Sponsorb
   return (SPONSORBLOCK_MODES as readonly string[]).includes(raw) ? (raw as SponsorblockMode) : fallback;
 }
 
+// Keep legacy DASHBOARD_PORT-only OAuth installations working. A new Unraid
+// toggle takes precedence, while an enabled dashboard with port 0 uses 8090.
+const legacyDashboardPort = intEnv("DASHBOARD_PORT", 0);
+const dashboardEnabled = boolEnv("DASHBOARD_ENABLED", legacyDashboardPort > 0);
+const configuredDashboardMode = process.env.DASHBOARD_AUTH_MODE?.trim().toLowerCase();
+if (configuredDashboardMode && !["local", "discord", "auto"].includes(configuredDashboardMode)) {
+  throw new Error("DASHBOARD_AUTH_MODE must be local, discord or auto");
+}
+const dashboardAuthMode = (configuredDashboardMode && configuredDashboardMode !== "auto"
+  ? configuredDashboardMode
+  : (process.env.DASHBOARD_PUBLIC_URL?.trim() && process.env.DASHBOARD_CLIENT_SECRET?.trim()
+    ? "discord" : "local")) as "local" | "discord";
+
 export const env = {
   discordToken: required("DISCORD_TOKEN"),
   discordClientId: required("DISCORD_CLIENT_ID"),
@@ -106,8 +119,12 @@ export const env = {
   lyricsEnabled: boolEnv("LYRICS_ENABLED", true),
   lyricsApiBase: process.env.LYRICS_API_BASE?.trim() || "https://lrclib.net",
   lyricsTimeoutMs: intEnv("LYRICS_TIMEOUT_MS", 8_000),
-  dashboardPort: intEnv("DASHBOARD_PORT", 0),
-  dashboardBind: process.env.DASHBOARD_BIND?.trim() || "127.0.0.1",
+  dashboardEnabled,
+  dashboardPort: dashboardEnabled ? (legacyDashboardPort || 8090) : 0,
+  dashboardAuthMode,
+  dashboardBind: process.env.DASHBOARD_BIND?.trim() ||
+    (dashboardAuthMode === "local" ? "0.0.0.0" : "127.0.0.1"),
+  dashboardPassword: process.env.DASHBOARD_PASSWORD?.trim() || undefined,
   dashboardPublicUrl: process.env.DASHBOARD_PUBLIC_URL?.trim() || undefined,
   dashboardClientSecret: process.env.DASHBOARD_CLIENT_SECRET?.trim() || undefined,
   radioAllowedHosts: (process.env.RADIO_ALLOWED_HOSTS ?? "")

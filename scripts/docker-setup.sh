@@ -78,8 +78,10 @@ fi
 
 printf "Configurer maintenant le dashboard HTTPS ? [y/N] "
 IFS= read -r use_dashboard || exit 1
-dashboard_port=0
-dashboard_bind=127.0.0.1
+dashboard_enabled=false
+dashboard_auth_mode=local
+dashboard_port=8090
+dashboard_bind=0.0.0.0
 dashboard_url=""
 dashboard_secret=""
 case "$use_dashboard" in
@@ -101,6 +103,8 @@ case "$use_dashboard" in
       echo "[Pulse] Format de secret OAuth invalide." >&2
       exit 1
     fi
+    dashboard_enabled=true
+    dashboard_auth_mode=discord
     dashboard_port=8080
     dashboard_bind=0.0.0.0
     ;;
@@ -115,6 +119,8 @@ while IFS= read -r line || [ -n "$line" ]; do
     DISCORD_TOKEN=*) printf "DISCORD_TOKEN=%s\n" "$token" ;;
     DISCORD_CLIENT_ID=*) printf "DISCORD_CLIENT_ID=%s\n" "$client_id" ;;
     DISCORD_GUILD_ID=*) printf "DISCORD_GUILD_ID=%s\n" "$guild_id" ;;
+    DASHBOARD_ENABLED=*) printf "DASHBOARD_ENABLED=%s\n" "$dashboard_enabled" ;;
+    DASHBOARD_AUTH_MODE=*) printf "DASHBOARD_AUTH_MODE=%s\n" "$dashboard_auth_mode" ;;
     DASHBOARD_PORT=*) printf "DASHBOARD_PORT=%s\n" "$dashboard_port" ;;
     DASHBOARD_BIND=*) printf "DASHBOARD_BIND=%s\n" "$dashboard_bind" ;;
     DASHBOARD_PUBLIC_URL=*) printf "DASHBOARD_PUBLIC_URL=%s\n" "$dashboard_url" ;;
@@ -129,7 +135,7 @@ trap - EXIT HUP INT TERM
 
 printf "\n[Pulse] Configuration écrite dans .env.docker (permissions 600).\n"
 printf "[Pulse] Les identifiants ne sont pas intégrés dans l'image Docker.\n"
-if [ "$dashboard_port" -eq 8080 ]; then
+if [ "$dashboard_enabled" = true ]; then
   printf "\nÉtape Discord : enregistrer exactement %s/oauth/callback dans OAuth2 Redirects.\n" "${dashboard_url%/}"
   printf "Puis démarrer derrière un reverse proxy HTTPS :\n"
   printf "  docker compose -f docker-compose.yml -f dashboard/docker-compose.dashboard.yml up -d\n"

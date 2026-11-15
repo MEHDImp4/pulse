@@ -30,9 +30,14 @@ describe("Unraid Community Applications template", () => {
       expect(entry).toContain('Mask="true"');
     }
   });
-  it("does not expose a dashboard HTTP port by default", () => {
-    expect(xml).toContain('Target="DASHBOARD_PORT" Default="0"');
-    expect(xml).not.toMatch(/Type="Port"/);
+  it("exposes a LAN dashboard with an opt-in toggle and configurable mapped host port", () => {
+    expect(xml).toContain('Target="DASHBOARD_ENABLED" Default="false"');
+    expect(xml).toContain('Target="8090" Default="8090" Mode="tcp"');
+    expect(xml).toContain('Type="Port" Display="always"');
+    expect(xml).toContain('<WebUI>http://[IP]:[PORT:8090]/</WebUI>');
+    expect(xml).toContain('Target="DASHBOARD_AUTH_MODE" Default="auto"');
+    const password = xml.split("\n").find((line) => line.includes('Target="DASHBOARD_PASSWORD"'));
+    expect(password).toContain('Mask="true"');
     expect(xml).toContain("--cap-add=CHOWN");
     expect(xml).toContain("--cap-add=SETUID");
     expect(xml).toContain("--cap-add=SETGID");

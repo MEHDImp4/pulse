@@ -31,3 +31,10 @@
 .health-grid span{display:block;color:#9ca5bd;font-size:11px;line-height:1.4}.health-grid strong{display:block;color:#d9d4ff;font-size:21px;margin-top:7px;font-weight:750}
 .health-note{color:#8891aa;font-size:11px;line-height:1.5;margin:16px 0 0}
 @media(max-width:750px){.health-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.health{padding:17px}}
+
+/* Unraid local dashboard login — password is never embedded in page markup. */
+.local-login{max-width:330px;margin:22px auto 0;display:flex;flex-direction:column;align-items:stretch;gap:10px;text-align:left}
+.local-login label{color:#b2b8d1;font-size:12px;font-weight:700}
+.local-login input{background:#111524;border:1px solid #414764;color:#e8ebfd;outline:none;border-radius:10px;padding:13px 14px;width:100%;min-width:0}
+.local-login input:focus{border-color:#9182ff;box-shadow:0 0 0 3px #7968f122}
+.local-login button{margin-top:5px}

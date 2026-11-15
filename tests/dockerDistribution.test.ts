@@ -27,7 +27,9 @@ describe("Docker first-run setup", () => {
     expect(env).toContain("DISCORD_CLIENT_ID=123456789012345678");
     expect(env).toContain("DISCORD_GUILD_ID=987654321098765432");
     expect(env).toContain("PULSE_DEPLOY_COMMANDS_ON_START=true");
-    expect(env).toContain("DASHBOARD_PORT=0");
+    expect(env).toContain("DASHBOARD_ENABLED=false");
+    expect(env).toContain("DASHBOARD_PORT=8090");
+    expect(env).toContain("DASHBOARD_AUTH_MODE=local");
     expect(statSync(join(root, ".env.docker")).mode & 0o777).toBe(0o600);
     expect(run.stdout).not.toContain(token);
     expect(run.stderr).not.toContain(token);
@@ -46,6 +48,8 @@ describe("Docker first-run setup", () => {
     });
     expect(result.status).toBe(0);
     const env = readFileSync(join(root, ".env.docker"), "utf8");
+    expect(env).toContain("DASHBOARD_ENABLED=true");
+    expect(env).toContain("DASHBOARD_AUTH_MODE=discord");
     expect(env).toContain("DASHBOARD_PORT=8080");
     expect(env).toContain("DASHBOARD_BIND=0.0.0.0");
     expect(env).toContain("DASHBOARD_PUBLIC_URL=https://pulse.example.com");

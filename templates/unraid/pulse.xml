@@ -11,12 +11,12 @@
   <Icon>https://raw.githubusercontent.com/MEHDImp4/pulse/master/assets/pulse-icon.png</Icon>
   <TemplateURL>https://raw.githubusercontent.com/MEHDImp4/pulse/master/templates/unraid/pulse.xml</TemplateURL>
   <ReadMe>https://raw.githubusercontent.com/MEHDImp4/pulse/master/docs/DOCKER_INSTALL.md</ReadMe>
-  <Overview>Pulse Discord Music est un bot musical auto-heberge pour Discord. Lecture YouTube, playlists, favoris, AutoDJ, controles DJ et tableau de bord OAuth facultatif. Installez-le sur Unraid en renseignant le token du bot et son Application ID. Aucune base de donnees externe n'est necessaire.</Overview>
-  <Description>Bot Discord musical prive, auto-heberge et facile a configurer. Les commandes slash sont enregistrees automatiquement. Les fichiers persistants sont enregistres dans AppData. Le dashboard est desactive par defaut et doit utiliser OAuth Discord et un reverse proxy HTTPS s'il est active.</Description>
+  <Overview>Pulse Discord Music : bot musical et dashboard facultatif sur Unraid. Activez le dashboard en un clic, choisissez un port et un mot de passe pour y acceder depuis votre reseau local sans OAuth ni domaine.</Overview>
+  <Description>Bot Discord musical auto-heberge, appdata permanent, commandes slash automatiques. Dashboard local desactive par defaut : activer, choisir le port, definir un mot de passe. OAuth Discord/HTTPS reste disponible en option avancee.</Description>
   <Category>Tools:Utilities</Category>
   <ExtraSearchTerms>Discord music bot audio player YouTube playlists radio autoDJ</ExtraSearchTerms>
   <License>MIT</License>
-  <WebUI></WebUI>
+  <WebUI>http://[IP]:[PORT:8090]/</WebUI>
   <ExtraParams>--init --security-opt=no-new-privileges --cap-drop=ALL --cap-add=CHOWN --cap-add=SETUID --cap-add=SETGID</ExtraParams>
   <Requires>Connexion internet sortante pour Discord, YouTube, yt-dlp et API musicales. Pas de GPU.</Requires>
   <Config Name="AppData - Pulse" Target="/data" Default="/mnt/user/appdata/pulse-discord-music" Mode="rw" Description="Stockage permanent : playlists, preferences, files d'attente et statistiques" Type="Path" Display="always" Required="true" Mask="false"/>
@@ -25,10 +25,13 @@
   <Config Name="Enregistrer les slash commands" Target="PULSE_DEPLOY_COMMANDS_ON_START" Default="true" Mode="" Description="Enregistre ou actualise automatiquement les slash commands a chaque demarrage" Type="Variable" Display="always" Required="false" Mask="false"/>
   <Config Name="Discord Guild ID (facultatif)" Target="DISCORD_GUILD_ID" Default="" Mode="" Description="Serveur de test : commandes immediates ; laisser vide pour commandes globales" Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Data directory" Target="DATA_DIR" Default="/data" Mode="" Description="Repertoire interne du volume persistant ; conserver /data" Type="Variable" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="Dashboard HTTP internal port" Target="DASHBOARD_PORT" Default="0" Mode="" Description="0 = desactive. Pour activer, utiliser 8080 et configurer l'URL HTTPS ainsi que l'OAuth Discord" Type="Variable" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="Dashboard listen address" Target="DASHBOARD_BIND" Default="0.0.0.0" Mode="" Description="Adresse interne. Ne pas publier le port HTTP sur Internet, utiliser un proxy HTTPS" Type="Variable" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="Dashboard public HTTPS URL" Target="DASHBOARD_PUBLIC_URL" Default="" Mode="" Description="URL HTTPS, par exemple https://pulse.example.com" Type="Variable" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="Discord OAuth Client Secret" Target="DASHBOARD_CLIENT_SECRET" Default="" Mode="" Description="Secret OAuth2 Discord pour le dashboard, ne pas confondre avec le token du bot" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Dashboard - Activer" Target="DASHBOARD_ENABLED" Default="false" Mode="" Description="false = bot seul. true = dashboard sur le reseau local avec mot de passe" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Dashboard - Port Web (Unraid)" Target="8090" Default="8090" Mode="tcp" Description="Port du serveur Unraid : http://IP_UNRAID:PORT. Port interne fixe : 8090. Exemple 8095 si 8090 est deja pris." Type="Port" Display="always" Required="true" Mask="false"/>
+  <Config Name="Dashboard - Mot de passe local" Target="DASHBOARD_PASSWORD" Default="" Mode="" Description="Obligatoire si dashboard local active. Mot de passe unique de 12 caracteres minimum. Donne acces a tous les serveurs du bot." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Dashboard - Mode de connexion" Target="DASHBOARD_AUTH_MODE" Default="auto" Mode="" Description="auto = local par defaut, ou conserve OAuth si anciens identifiants presents. local = mot de passe. discord = OAuth2 HTTPS." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Dashboard - Adresse interne" Target="DASHBOARD_BIND" Default="0.0.0.0" Mode="" Description="Conserver 0.0.0.0 pour acces depuis le LAN Unraid via le port publie." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Dashboard - URL HTTPS OAuth" Target="DASHBOARD_PUBLIC_URL" Default="" Mode="" Description="Seulement pour mode discord : URL HTTPS publique et callback /oauth/callback." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Dashboard - Secret OAuth Discord" Target="DASHBOARD_CLIENT_SECRET" Default="" Mode="" Description="Seulement pour mode discord. Secret OAuth du portail Discord, different du token du bot." Type="Variable" Display="advanced" Required="false" Mask="true"/>
   <Config Name="Spotify Client ID" Target="SPOTIFY_CLIENT_ID" Default="" Mode="" Description="Optionnel : informations des titres Spotify" Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Spotify Client Secret" Target="SPOTIFY_CLIENT_SECRET" Default="" Mode="" Description="Optionnel : identifiant secret de l'API Spotify" Type="Variable" Display="advanced" Required="false" Mask="true"/>
   <Config Name="Spotify OAuth Refresh Token" Target="SPOTIFY_REFRESH_TOKEN" Default="" Mode="" Description="Optionnel : playlists accessibles au compte Spotify OAuth" Type="Variable" Display="advanced" Required="false" Mask="true"/>

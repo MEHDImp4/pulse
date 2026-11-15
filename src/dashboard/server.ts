@@ -8,6 +8,7 @@ import { logger } from "../utils/logger";
 import { listeningStats } from "../music/ListeningStats";
 import {
   canManageGuild, DashboardSessionStore, isValidDashboardAction,
+  isLocalDashboardHost, LocalDashboardAuth,
   randomToken, secureEquals, type OAuthGuild, type DashboardSession,
 } from "./security";
 
@@ -65,6 +66,11 @@ async function exchangeCode(code: string, redirectUri: string): Promise<{
 }
 
 async function guildsFor(session: DashboardSession, client: Client): Promise<OAuthGuild[]> {
+  // Possession of the local password grants administration of every guild the
+  // bot is already in. No Discord OAuth permissions are inferred in this mode.
+  if (env.dashboardAuthMode === "local" && session.localAuthenticated) {
+    return client.guilds.cache.map((g) => ({ id: g.id, name: g.name, permissions: "0", owner: true }));
+  }
   const list = await discordGet<OAuthGuild[]>("/users/@me/guilds", session.accessToken!);
   return list.filter((g) => canManageGuild(g) && client.guilds.cache.has(g.id));
 }
@@ -83,8 +89,9 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 
 function sessionFor(req: IncomingMessage): DashboardSession | undefined {
   const session = sessions.get(cookieId(req));
-  return session?.accessToken && session.userId && session.expiresAt && session.expiresAt > Date.now()
-    ? session : undefined;
+  if (!session?.userId || !session.expiresAt || session.expiresAt <= Date.now()) return undefined;
+  if (env.dashboardAuthMode === "local") return session.localAuthenticated === true ? session : undefined;
+  return session.accessToken ? session : undefined;
 }
 
 function staticFile(res: ServerResponse, file: "index.html" | "app.js" | "styles.css"): void {
@@ -96,22 +103,38 @@ function staticFile(res: ServerResponse, file: "index.html" | "app.js" | "styles
 }
 
 /**
- * Same-origin, OAuth2-protected admin dashboard. No bot token or client secret
- * is sent to browsers. Every guild action re-checks OAuth membership and
- * ManageGuild; there is no cross-server information in public endpoints.
+ * Optional admin dashboard. Local mode uses a password and private-LAN host
+ * check; Discord OAuth mode preserves ManageGuild checks and HTTPS callback.
+ * All mutations still require an authenticated session and CSRF protection.
  */
 export function startDashboard(players: PlayerManager, client: Client): Server | undefined {
   if (!env.dashboardPort) return undefined;
-  if (!env.dashboardClientSecret || !env.dashboardPublicUrl) {
-    throw new Error("DASHBOARD_CLIENT_SECRET and DASHBOARD_PUBLIC_URL required");
+  const isLocal = env.dashboardAuthMode === "local";
+  if (isLocal && (!env.dashboardPassword || env.dashboardPassword.length < 12 ||
+      Buffer.byteLength(env.dashboardPassword, "utf8") > 256)) {
+    logger.error("Local dashboard disabled: set a unique DASHBOARD_PASSWORD of 12 to 256 bytes");
+    return undefined; // Keep Discord music online even if the optional UI is misconfigured.
   }
-  const origin = new URL(env.dashboardPublicUrl);
-  if (origin.protocol !== "https:" &&
+  if (!isLocal && (!env.dashboardClientSecret || !env.dashboardPublicUrl)) {
+    logger.error("OAuth dashboard disabled: DASHBOARD_CLIENT_SECRET and DASHBOARD_PUBLIC_URL are required");
+    return undefined;
+  }
+  const localAuth = isLocal ? new LocalDashboardAuth(env.dashboardPassword!) : undefined;
+  const origin = new URL(isLocal ? "http://localhost" : env.dashboardPublicUrl!);
+  if (!isLocal && origin.protocol !== "https:" &&
       !(origin.protocol === "http:" && ["localhost", "127.0.0.1"].includes(origin.hostname))) {
     throw new Error("Dashboard public URL must use HTTPS outside localhost");
   }
-  const secureCookie = origin.protocol === "https:";
+  const secureCookie = !isLocal && origin.protocol === "https:";
   const redirectUri = new URL("/oauth/callback", origin).toString();
+
+  function allowMutation(req: IncomingMessage): boolean {
+    if (req.headers["sec-fetch-site"] === "cross-site") return false;
+    const browserOrigin = req.headers.origin;
+    if (!browserOrigin) return true;
+    if (!isLocal) return browserOrigin === origin.origin;
+    return browserOrigin === `http://${req.headers.host}`;
+  }
 
   const server = createServer((req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -122,13 +145,41 @@ export function startDashboard(players: PlayerManager, client: Client): Server |
     if (secureCookie) res.setHeader("Strict-Transport-Security", "max-age=31536000");
 
     void (async () => {
+      if (isLocal && !isLocalDashboardHost(req.headers.host)) {
+        reply(res, 403, { error: "Accès local : utilise l'adresse IP privée de ton serveur Unraid" });
+        return;
+      }
       const url = new URL(req.url ?? "/", origin);
       const path = url.pathname;
       if (req.method === "GET" && ["/", "/app.js", "/styles.css"].includes(path)) {
         staticFile(res, path === "/" ? "index.html" : path.substring(1) as "app.js" | "styles.css");
         return;
       }
+      if (req.method === "GET" && path === "/api/config") {
+        reply(res, 200, { authMode: env.dashboardAuthMode });
+        return;
+      }
+      if (req.method === "POST" && path === "/local/login") {
+        if (!isLocal) { reply(res, 404, { error: "Connexion locale indisponible" }); return; }
+        if (!allowMutation(req) || !req.headers["content-type"]?.startsWith("application/json")) {
+          reply(res, 403, { error: "Requête non autorisée" }); return;
+        }
+        const body = await readJson(req) as { password?: unknown } | null;
+        const result = localAuth!.check(body?.password, req.socket.remoteAddress);
+        if (result === "limited") { reply(res, 429, { error: "Trop d'essais. Réessaie dans 10 minutes." }); return; }
+        if (result !== "ok") { reply(res, 401, { error: "Mot de passe incorrect" }); return; }
+        const { id, session } = sessions.create();
+        session.userId = "local-admin";
+        session.username = "Administrateur local";
+        session.localAuthenticated = true;
+        session.expiresAt = Date.now() + 60 * 60_000;
+        session.csrfToken = randomToken();
+        res.setHeader("Set-Cookie", cookieHeader(id, false));
+        reply(res, 200, { ok: true });
+        return;
+      }
       if (req.method === "GET" && path === "/login") {
+        if (isLocal) { redirect(res, "/"); return; }
         const { id, session } = sessions.create();
         const oauthUrl = new URL("https://discord.com/oauth2/authorize");
         oauthUrl.search = new URLSearchParams({
@@ -144,6 +195,7 @@ export function startDashboard(players: PlayerManager, client: Client): Server |
         return;
       }
       if (req.method === "GET" && path === "/oauth/callback") {
+        if (isLocal) { reply(res, 404, { error: "OAuth inactif en mode local" }); return; }
         const session = sessions.get(cookieId(req));
         const state = url.searchParams.get("state") ?? "";
         const code = url.searchParams.get("code") ?? "";
@@ -165,7 +217,8 @@ export function startDashboard(players: PlayerManager, client: Client): Server |
       }
       if (req.method === "POST" && path === "/logout") {
         const session = sessionFor(req);
-        if (!session || !secureEquals(session.csrfToken ?? "", String(req.headers["x-csrf-token"] ?? ""))) {
+        if (!session || !allowMutation(req) ||
+            !secureEquals(session.csrfToken ?? "", String(req.headers["x-csrf-token"] ?? ""))) {
           reply(res, 403, { error: "Accès refusé" }); return;
         }
         sessions.revoke(cookieId(req));
@@ -218,8 +271,7 @@ export function startDashboard(players: PlayerManager, client: Client): Server |
       if (!secureEquals(session.csrfToken ?? "", String(req.headers["x-csrf-token"] ?? ""))) {
         reply(res, 403, { error: "CSRF token invalide" }); return;
       }
-      const requestOrigin = req.headers.origin;
-      if (requestOrigin && requestOrigin !== origin.origin) {
+      if (!allowMutation(req)) {
         reply(res, 403, { error: "Origine non autorisée" }); return;
       }
       const payload = await readJson(req);
@@ -302,7 +354,10 @@ export function startDashboard(players: PlayerManager, client: Client): Server |
   });
 
   server.listen(env.dashboardPort, env.dashboardBind, () => {
-    logger.info({ port: env.dashboardPort, bind: env.dashboardBind }, "OAuth2 dashboard listening");
+    logger.info({
+      port: env.dashboardPort, bind: env.dashboardBind,
+      authMode: env.dashboardAuthMode,
+    }, "Pulse dashboard listening");
   });
   server.on("error", (error) => logger.error({ err: error }, "Dashboard listener error"));
   return server;

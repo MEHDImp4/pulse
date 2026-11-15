@@ -33,7 +33,7 @@ Pulse te permet d'écouter de la musique avec tes amis dans les salons vocaux Di
 | Recherche et playlists YouTube | Favoris et playlists personnelles | Image Docker précompilée |
 | SoundCloud et radios publiques compatibles | Rôles DJ configurables et vote-skip | Template Docker Unraid |
 | Liens Spotify, Deezer et Apple Music¹ | Fair Queue et boutons Discord | Synchronisation automatique des slash commands |
-| Autoplay, filtres audio et paroles | Files d'attente indépendantes | Dashboard OAuth2 facultatif |
+| Autoplay, filtres audio et paroles | Files d'attente indépendantes | Dashboard local ou OAuth2 facultatif |
 
 ¹ **À savoir :** Spotify, Deezer et Apple Music sont utilisés pour leurs **métadonnées** (titres, artistes, playlists compatibles). Pulse recherche ensuite des morceaux correspondants auprès de ses fournisseurs audio. Il ne lit pas directement les flux audio premium de ces plateformes. L'importation des playlists Spotify nécessite un compte OAuth propriétaire ou collaborateur de la playlist ; Apple Music nécessite un jeton développeur pour les playlists du catalogue.
 
@@ -183,38 +183,47 @@ Le **Party Mode** (`/party mode:on`) maintient un ordre équitable automatiqueme
 
 Avec `/queue`, un **menu déroulant** permet désormais de sélectionner l'un des morceaux de la page. Les DJ présents dans le salon vocal peuvent ensuite le monter, le descendre ou le supprimer depuis un panneau privé. Une sélection devenue obsolète après changement de la file est refusée ; en Party Mode, le déplacement manuel est désactivé pour conserver l'équité.
 
-Le dashboard facultatif affiche le mode soirée, la limite par utilisateur, le nombre de titres déjà en cache, les téléchargements en cours ainsi que les mesures de transition audio déjà disponibles via `/status`. Ses contrôles sont protégés par l'authentification Discord OAuth2, la vérification des permissions de gestion du serveur et le jeton CSRF existants.
+Le dashboard facultatif affiche le mode soirée, la limite par utilisateur, le nombre de titres déjà en cache, les téléchargements en cours ainsi que les mesures de transition audio déjà disponibles via `/status`. Il propose un accès local avec mot de passe (sur Unraid) ou Discord OAuth2/HTTPS en option avancée. Les actions exigent une session authentifiée et une protection CSRF.
 
 ## Dashboard web facultatif
 
-Pulse possède un tableau de bord responsive avec authentification **Discord OAuth2** :
+Pulse possède un tableau de bord responsive pour les commandes de lecture,
+les files d'attente, le Party Mode, le cache audio et les statistiques.
 
-- Liste des serveurs que tu es autorisé à gérer et sur lesquels le bot est présent.
-- Morceau en cours, volume, lecture/pause, skip et arrêt.
-- Ajout et réorganisation des musiques par glisser-déposer.
-- Statistiques par serveur : titres et artistes populaires, nombre de lectures.
+**Installation locale sur Unraid, sans OAuth2 Discord :**
 
-**Le dashboard est désactivé par défaut.** Pour Docker Compose :
+1. Dans **Docker → Pulse-Discord-Music → Edit**, mettre
+   **Dashboard - Activer** sur `true`.
+2. Choisir le **Dashboard - Port Web (Unraid)** : `8090` par défaut,
+   ou un autre port libre (`8095` par exemple).
+3. Définir un **mot de passe local** unique d'au moins 12 caractères,
+   garder le mode avancé `auto` (ou `local` si d'anciens secrets OAuth restent configurés), puis cliquer sur **Apply**.
+4. Ouvrir le bouton **WebUI** du conteneur ou
+   `http://IP_UNRAID:PORT_CHOISI`, puis entrer le mot de passe.
 
-1. Ajoute dans `.env.docker` :
+**Aucun domaine, certificat, client secret ni redirect OAuth n'est requis pour
+cet accès LAN.** Le mode local donne l'administration de tous les serveurs
+où Pulse est présent à la personne qui possède le mot de passe. Ne jamais
+exposer directement ce port HTTP sur Internet ou sur un Wi-Fi non fiable.
 
-   ```dotenv
-   DASHBOARD_PORT=8080
-   DASHBOARD_PUBLIC_URL=https://pulse.example.com
-   DASHBOARD_CLIENT_SECRET=TON_DISCORD_OAUTH_CLIENT_SECRET
-   ```
+[Petit tutoriel illustré par étapes](docs/UNRAID_DASHBOARD.md) ·
+[Guide complet Docker et Unraid](docs/DOCKER_INSTALL.md)
 
-2. Dans le [Discord Developer Portal](https://discord.com/developers/applications), ajoute l'URL de redirection exacte `https://pulse.example.com/oauth/callback` dans **OAuth2 → Redirects**.
-3. Lance l'extension Compose du dashboard :
+**Mode distant avancé, avec Discord OAuth2 et HTTPS :**
 
-   ```sh
-   docker compose -f docker-compose.yml \
-     -f dashboard/docker-compose.dashboard.yml up -d
-   ```
+```dotenv
+DASHBOARD_ENABLED=true
+DASHBOARD_AUTH_MODE=discord
+DASHBOARD_PORT=8080
+DASHBOARD_PUBLIC_URL=https://pulse.example.com
+DASHBOARD_CLIENT_SECRET=TON_DISCORD_OAUTH_CLIENT_SECRET
+```
 
-4. Configure un **reverse proxy HTTPS** (Nginx Proxy Manager, Caddy ou Nginx). Le port est exposé uniquement sur `127.0.0.1` côté hôte par le fichier Compose fourni. Si le proxy est aussi dans Docker, configure un réseau partagé adapté.
-
-**N'expose jamais directement le port HTTP du dashboard sur Internet.** Le contrôle distant s'applique à un lecteur Discord déjà connecté. Sur Unraid, consulte le [guide du dashboard](docs/DOCKER_INSTALL.md#dashboard-sur-unraid).
+Déclarer `https://pulse.example.com/oauth/callback` dans
+**Discord Developer Portal → OAuth2 → Redirects**, puis lancer
+l'overlay `dashboard/docker-compose.dashboard.yml` derrière un
+**reverse proxy HTTPS**. Le mode OAuth vérifie les droits Discord
+« Gérer le serveur » à chaque requête.
 
 ## Configuration et sauvegardes
 
@@ -232,7 +241,10 @@ Seuls `DISCORD_TOKEN` et `DISCORD_CLIENT_ID` sont obligatoires.
 | `QUEUE_PERSIST` | `true` | Restauration des files d'attente |
 | `NOWPLAYING_INTERVAL_MS` | `5000` | Fréquence d'actualisation du morceau actuel |
 | `METADATA_MAX_CONCURRENT` | `3` | Limite les recherches de métadonnées simultanées |
-| `DASHBOARD_PORT` | `0` | Active ou désactive le dashboard |
+| `DASHBOARD_ENABLED` | `false` | Active ou désactive le dashboard |
+| `DASHBOARD_PORT` | `8090` si activé | Port HTTP interne ; configurer le port hôte dans Unraid |
+| `DASHBOARD_AUTH_MODE` | `local` | Connexion locale par mot de passe ou Discord OAuth2 |
+| `DASHBOARD_PASSWORD` | Vide | Obligatoire en mode local activé, 12 caractères minimum |
 
 Les options détaillées se trouvent dans [`.env.docker.example`](.env.docker.example) et [`.env.example`](.env.example).
 
@@ -241,7 +253,7 @@ Les options détaillées se trouvent dans [`.env.docker.example`](.env.docker.ex
 ## Architecture
 
 ```text
-Commandes Discord / boutons        Dashboard OAuth2 (facultatif)
+Commandes Discord / boutons        Dashboard local / OAuth2 (facultatif)
                │                               │
                └───────────────┬───────────────┘
                                ▼
@@ -273,7 +285,7 @@ Pulse conserve en cache disque les fichiers audio compressés compatibles dans l
 | Pas de son | Tester `/testaudio`, consulter les logs et vérifier la disponibilité de la source |
 | Playlist vide | Vérifier le lien, les restrictions du fournisseur et `PLAYLIST_MAX_ITEMS` |
 | Données Unraid non sauvegardées | Vérifier le montage de l'AppData vers `/data` |
-| Connexion au dashboard impossible | Vérifier HTTPS, l'URL de redirection OAuth2, le Client Secret et les permissions Discord |
+| Connexion au dashboard impossible | En local : vérifier `DASHBOARD_ENABLED`, le port 8090, l'IP privée et le mot de passe. En OAuth : vérifier HTTPS et les redirects Discord |
 
 Sous Docker Compose : `docker compose logs --tail=100 bot`. Sous Unraid : **Docker → Pulse-Discord-Music → Logs**.
 
@@ -294,6 +306,7 @@ La CI teste TypeScript, les fonctionnalités et la construction Docker ; CodeQL 
 - [Contribuer au projet](CONTRIBUTING.md)
 - [Politique de sécurité et signalement privé](SECURITY.md)
 - [Guide d'installation Docker / Unraid](docs/DOCKER_INSTALL.md)
+- [Activer le dashboard local sur Unraid](docs/UNRAID_DASHBOARD.md)
 - [Cahier des charges initial](docs/CAHIER_DES_CHARGES.md)
 - [Issues et suggestions](https://github.com/MEHDImp4/pulse/issues)
 
