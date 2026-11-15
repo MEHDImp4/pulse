@@ -68,6 +68,39 @@ describe("PlayerManager", () => {
     if (otherGuild.status === "ok") otherGuild.release();
   });
 
+  it("serializes 30 overlapping commands across three guilds without cross-guild blocking", async () => {
+    const manager = new PlayerManager(new StubProvider());
+    const active = new Map<string, number>();
+    const peak = new Map<string, number>();
+    const order = new Map<string, number[]>();
+    const users = Array.from({ length: 30 }, (_, i) => ({
+      guild: `stress-${i % 3}`,
+      order: Math.floor(i / 3),
+    }));
+
+    await Promise.all(users.map(async ({ guild, order: index }) => {
+      const admission = await manager.waitForPlaybackStart(guild, "main-voice");
+      expect(admission.status).toBe("ok");
+      if (admission.status !== "ok") return;
+      const next = (active.get(guild) ?? 0) + 1;
+      active.set(guild, next);
+      peak.set(guild, Math.max(peak.get(guild) ?? 0, next));
+      order.set(guild, [...(order.get(guild) ?? []), index]);
+      try {
+        await new Promise<void>((resolve) => setTimeout(resolve, 1));
+      } finally {
+        active.set(guild, next - 1);
+        admission.release();
+      }
+    }));
+
+    for (const guild of ["stress-0", "stress-1", "stress-2"]) {
+      expect(peak.get(guild)).toBe(1);
+      expect(active.get(guild)).toBe(0);
+      expect(order.get(guild)).toEqual(Array.from({ length: 10 }, (_, i) => i));
+    }
+  });
+
   it("drops timed-out waiters and does not leave a guild locked", async () => {
     vi.useFakeTimers();
     try {
