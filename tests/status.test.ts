@@ -28,7 +28,7 @@ describe("/status diagnostics", () => {
     diagnostics.preloadUsed();
     diagnostics.stallRecovered();
 
-    const reply = vi.fn(async () => undefined);
+    const reply = vi.fn(async (_payload: unknown) => undefined);
     const getForGuild = vi.fn((guild: string) => guild === "allowed" ? [{
       isConnected: true,
       channelId: "123456789012345678",
