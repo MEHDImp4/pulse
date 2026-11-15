@@ -149,6 +149,9 @@ describe("audio quality settings", () => {
     expect(sanitizeSettings({ fadeSeconds: -8, normalize: "yes", trimStartSilence: 42 }))
       .toMatchObject({ fadeSeconds: 0, normalize: false, trimStartSilence: false });
     expect(sanitizeSettings({ fadeSeconds: "7" }).fadeSeconds).toBe(2);
+    expect(sanitizeSettings({ crossfadeSeconds: 999 }).crossfadeSeconds).toBe(5);
+    expect(sanitizeSettings({ crossfadeSeconds: -4 }).crossfadeSeconds).toBe(0);
+    expect(DEFAULT_GUILD_SETTINGS.crossfadeSeconds).toBe(0);
   });
 
   it("persists normalization and silence settings across restarts", () => {
@@ -156,7 +159,7 @@ describe("audio quality settings", () => {
     const file = join(directory, "settings.json");
     try {
       const first = new GuildSettingsStore(file, 0);
-      first.update("gq:one", "gq", { normalize: true, trimStartSilence: true, fadeSeconds: 0 });
+      first.update("gq:one", "gq", { normalize: true, trimStartSilence: true, fadeSeconds: 0, crossfadeSeconds: 3 });
       first.flush();
       const next = new GuildSettingsStore(file, 0);
       next.load();
@@ -164,6 +167,7 @@ describe("audio quality settings", () => {
         normalize: true,
         trimStartSilence: true,
         fadeSeconds: 0,
+        crossfadeSeconds: 3,
       });
     } finally {
       rmSync(directory, { recursive: true, force: true });
