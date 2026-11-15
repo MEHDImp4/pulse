@@ -220,6 +220,14 @@ async function sendAction(action, params = {}) {
 
 async function start() {
   try {
+    const config = await api("/api/config");
+    const local = config.authMode === "local";
+    $("local-login").hidden = !local;
+    $("discord-login").hidden = local;
+    $("login-title").textContent = local ? "Connexion au dashboard local" : "Connecte ton compte Discord";
+    $("login-description").textContent = local
+      ? "Entre le mot de passe défini dans le conteneur Unraid. Accès réservé au réseau privé."
+      : "Seuls les membres autorisés à gérer le serveur Discord ont accès au dashboard.";
     const me = await api("/api/me");
     state.csrf = me.csrf;
     $("username").textContent = me.username;
@@ -239,6 +247,17 @@ async function start() {
     if (error.message !== "Connexion requise") notice(error.message);
   }
 }
+$("local-login").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const password = $("local-password").value;
+  try {
+    await api("/local/login", { method: "POST", body: JSON.stringify({ password }) });
+    $("local-password").value = "";
+    await start();
+  } catch (error) {
+    notice(error.message);
+  }
+});
 $("party-toggle").addEventListener("click", () => {
   if (!state.player) return;
   void sendAction("party", {
