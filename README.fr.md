@@ -197,6 +197,8 @@ Seuls `DISCORD_TOKEN` et `DISCORD_CLIENT_ID` sont obligatoires.
 | `DISCORD_GUILD_ID` | Vide | Commandes limitées à un serveur de test |
 | `DATA_DIR` | `/data` sous Docker | Données persistantes |
 | `MAX_QUEUE_SIZE` | `100` | Limite de la file d'attente |
+| `PLAYBACK_MAX_PENDING` | `12` | Maximum de commandes musicales en attente par serveur |
+| `PLAYBACK_WAIT_TIMEOUT_MS` | `30000` | Attente maximale avant abandon d’une demande, en ms |
 | `PLAYLIST_MAX_ITEMS` | `50` | Limite d'import d'une playlist |
 | `AUTOPLAY_DEFAULT` | `true` | Lecture de suggestions automatiques |
 | `QUEUE_PERSIST` | `true` | Restauration des files d'attente |
