@@ -62,6 +62,18 @@ describe("persistent party queue mode", () => {
     expect(player.queue.snapshot().map((song) => song.id)).toEqual(["a1", "a2", "b1"]);
   });
 
+  it("rejects a fourth request from the same user but allows a different requester", async () => {
+    const player = new GuildPlayer("party", "voice", new StubProvider(), () => {});
+    // Simulate an active track without needing a Discord voice socket.
+    Object.assign(player, { _currentTrack: track("playing", "host") });
+    player.configureParty(true, 3);
+    for (const id of ["a1", "a2", "a3"]) await player.add(track(id, "a"));
+    await expect(player.add(track("a4", "a"))).rejects.toThrow("maximum 3");
+    await expect(player.add(track("b1", "b"))).resolves.toMatchObject({ started: false });
+    expect(player.queue.countByRequester("a")).toBe(3);
+    expect(player.queue.countByRequester("b")).toBe(1);
+  });
+
   it("clamps invalid per-user limit rather than disabling the cap", () => {
     const player = new GuildPlayer("party", "voice", new StubProvider(), () => {});
     player.configureParty(true, 100);
