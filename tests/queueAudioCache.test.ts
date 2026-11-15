@@ -20,7 +20,7 @@ class FixtureProvider implements AudioProvider {
   readonly name = "youtube" as const;
   readonly calls: string[] = [];
   readonly payloads = new Map<string, Buffer>();
-  readonly createSource = vi.fn(async (song: Track): Promise<AudioSource> => {
+  createSource = vi.fn(async (song: Track): Promise<AudioSource> => {
     this.calls.push(song.id);
     const bytes = this.payloads.get(song.id) ?? Buffer.from("compressed-" + song.id);
     const proc = spawn(process.execPath, [
