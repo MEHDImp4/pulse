@@ -15,6 +15,8 @@ export interface NowPlayingSnapshot {
   loopMode: string;
   autoplay: boolean;
   queueSize: number;
+  partyMode: boolean;
+  partyMaxPerUser: number;
 }
 
 /** Stable signature of the card; two equal signatures render identically. */
@@ -28,6 +30,8 @@ export function renderSignature(snapshot: NowPlayingSnapshot): string {
     snapshot.loopMode,
     snapshot.autoplay ? "1" : "0",
     snapshot.queueSize,
+    snapshot.partyMode ? "1" : "0",
+    snapshot.partyMaxPerUser,
   ].join("|");
 }
 
@@ -43,6 +47,8 @@ export function playerSnapshot(player: GuildPlayer): NowPlayingSnapshot | undefi
     loopMode: player.loopMode,
     autoplay: player.autoplay,
     queueSize: player.queueSize,
+    partyMode: player.partyMode,
+    partyMaxPerUser: player.partyMaxPerUser,
   };
 }
 
