@@ -913,6 +913,7 @@ export class GuildPlayer {
       this.autoplayCount = 0;
       this.clearAutoplayRetry();
       this.nextTrackPreloader.cancel();
+      this.crossfadePreloader.cancel();
       await this.killProcesses();
       this.audioPlayer.stop(true);
       this._state = "IDLE";
@@ -1088,17 +1089,18 @@ export class GuildPlayer {
     if (this.history.length > 25) this.history.shift();
   }
 
-  private async startTrack(track: Track, startSeconds = 0, isRecovery = false): Promise<void> {
+  private async startTrack(track: Track, startSeconds = 0, isRecovery = false, crossfadeSource?: AudioPipelineResult): Promise<void> {
     if (!this.connection || this.connection.state.status !== VoiceConnectionStatus.Ready) {
       throw new Error("Voice connection is not ready");
     }
 
     // Claim the already-buffered next track before changing the current state,
     // which would otherwise invalidate the pending preload.
-    const preloaded = startSeconds === 0 && env.preloadNextTrack
+    const preloaded = crossfadeSource ?? (startSeconds === 0 && env.preloadNextTrack
       ? await this.nextTrackPreloader.take(this.preloadKey(track), env.preloadSwitchWaitMs)
-      : undefined;
+      : undefined);
     this.nextTrackPreloader.cancel();
+    this.crossfadePreloader.cancel();
 
     this.clearIdleTimer();
     this._state = "BUFFERING";
@@ -1111,7 +1113,16 @@ export class GuildPlayer {
     this.rememberTrack(track);
     this.skipVotes.clear();
     try {
-      await this.killProcesses();
+      const previousCleanup = this.killProcesses();
+      if (crossfadeSource) {
+        // The mixed PCM is already primed; finish terminating the old
+        // process concurrently rather than introducing an audible pause.
+        void previousCleanup.catch((error) => {
+          logger.warn({ err: error, guild: this.guildId }, "Old source cleanup after crossfade failed");
+        });
+      } else {
+        await previousCleanup;
+      }
     } catch (error) {
       if (preloaded) await this.disposePreloadedAudio(preloaded);
       throw error;
@@ -1250,6 +1261,9 @@ export class GuildPlayer {
     this.clearEmptyChannelTimer();
     this.clearAutoplayRetry();
     this.nextTrackPreloader.cancel();
+    this.crossfadePreloader.cancel();
+    if (this.crossfadeTimer) clearInterval(this.crossfadeTimer);
+    this.crossfadeTimer = undefined;
     if (this.preloadTimer) clearInterval(this.preloadTimer);
     this.preloadTimer = undefined;
     if (this.stallTimer) clearInterval(this.stallTimer);
