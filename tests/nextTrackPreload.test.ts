@@ -24,7 +24,7 @@ describe("waitForAudioBuffer", () => {
   it("reports a terminated or failed source before buffer readiness", async () => {
     const stream = new PassThrough();
     const pending = waitForAudioBuffer({ playStream: stream } as never, 1_000, new AbortController().signal);
-    stream.end();
+    stream.destroy();
     await expect(pending).rejects.toThrow("closed");
     stream.destroy();
   });
@@ -75,6 +75,7 @@ describe("NextTrackPreloader", () => {
     expect(await preload.take("bad", 20)).toBeUndefined();
     expect(dispose).toHaveBeenCalledWith({ id: 0 });
     preload.warm("good", async () => ({ id: 1 }));
+    expect(await preload.take("good", 20)).toEqual({ id: 1 });
   });
 
   it("cleans up if playback switches before the standby audio is ready", async () => {
