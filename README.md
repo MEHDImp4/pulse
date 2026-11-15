@@ -195,7 +195,7 @@ Pulse includes a responsive playback, queue, Party Mode and audio-health dashboa
 2. Choose the **Dashboard - Port Web (Unraid)**, initially `8090`
    or an available host port such as `8095`.
 3. Set a unique **Dashboard - Mot de passe local** with at least
-   12 characters, then click **Apply**.
+   12 characters, leave auth mode on `auto` (select `local` if old OAuth settings remain), then click **Apply**.
 4. Use the container's **WebUI** shortcut or open
    `http://UNRAID_LAN_IP:YOUR_PORT` from your trusted local network.
 
