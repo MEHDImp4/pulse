@@ -133,6 +133,8 @@ Set `DISCORD_GUILD_ID` if you want slash commands registered only in your test s
 
 Join a voice channel first, then try `/play`. Most actions work as native Discord slash commands; you do not need to memorize text prefixes.
 
+Music commands (`/play`, `/playnext`, `/playlist`) use **private, short-lived confirmations** (controlled by `AUTO_DELETE_SECONDS`, default 1 second). The shared **Now Playing** card is posted separately, stays interactive, and is updated instead of creating duplicate cards. Pulse needs **Send Messages** and **Embed Links** permissions in the text channel.
+
 | Command | What it does |
 |---|---|
 | `/play query:<title or URL>` | Search or queue a track; also recognizes supported playlists |
