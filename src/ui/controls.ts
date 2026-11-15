@@ -1,8 +1,11 @@
+import { createHash } from "node:crypto";
 import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
 } from "discord.js";
+import type { Track } from "../music/Track";
 import { env } from "../config/env";
 
 export type MusicControlAction =
@@ -149,5 +152,85 @@ export function queueControlsRow(
       .setLabel("Suivant")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(page >= lastPage),
+  );
+}
+
+
+const QUEUE_SELECT_PREFIX = "qs:";
+const QUEUE_ACTION_PREFIX = "qa:";
+export type QueueAction = "up" | "down" | "remove";
+
+/** Stable short fingerprint for a selected queue occurrence. */
+export function queueTrackFingerprint(track: Track): string {
+  return createHash("sha256")
+    .update(track.provider).update("\0")
+    .update(track.webpageUrl).update("\0")
+    .update(track.requestedBy.id)
+    .digest("hex").slice(0, 12);
+}
+
+export function queueSelectId(channelId: string): string {
+  return QUEUE_SELECT_PREFIX + channelId;
+}
+
+export function parseQueueSelect(customId: string): string | undefined {
+  if (!customId.startsWith(QUEUE_SELECT_PREFIX)) return undefined;
+  const channelId = customId.slice(QUEUE_SELECT_PREFIX.length);
+  return channelId.length > 0 && channelId.length <= 30 ? channelId : undefined;
+}
+
+export function queueActionId(channelId: string, action: QueueAction, position: number, fingerprint: string): string {
+  return `${QUEUE_ACTION_PREFIX}${channelId}:${action}:${position}:${fingerprint}`;
+}
+
+export function parseQueueAction(customId: string): {
+  channelId: string;
+  action: QueueAction;
+  position: number;
+  fingerprint: string;
+} | undefined {
+  if (!customId.startsWith(QUEUE_ACTION_PREFIX)) return undefined;
+  const match = /^qa:([^:]{1,30}):(up|down|remove):(\d{1,3}):([a-f0-9]{12})$/.exec(customId);
+  if (!match) return undefined;
+  return {
+    channelId: match[1],
+    action: match[2] as QueueAction,
+    position: Number(match[3]),
+    fingerprint: match[4],
+  };
+}
+
+export function queueSelectRow(
+  channelId: string,
+  tracks: readonly Track[],
+  page: number,
+  perPage = 10,
+): ActionRowBuilder<StringSelectMenuBuilder> {
+  const first = Math.max(0, Math.floor(page)) * perPage;
+  const selection = tracks.slice(first, first + perPage);
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId(queueSelectId(channelId))
+    .setPlaceholder("Choisir une musique à gérer")
+    .addOptions(selection.map((track, index) => ({
+      label: `${first + index + 1}. ${track.title}`.slice(0, 100),
+      value: `${first + index}:${queueTrackFingerprint(track)}`,
+      description: (track.author ?? track.requestedBy.username).slice(0, 100),
+    })));
+  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+}
+
+export function queueActionRow(
+  channelId: string,
+  position: number,
+  fingerprint: string,
+  queueSize: number,
+): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(queueActionId(channelId, "up", position, fingerprint))
+      .setLabel("Monter").setEmoji("⬆️").setStyle(ButtonStyle.Secondary).setDisabled(position <= 0),
+    new ButtonBuilder().setCustomId(queueActionId(channelId, "down", position, fingerprint))
+      .setLabel("Descendre").setEmoji("⬇️").setStyle(ButtonStyle.Secondary).setDisabled(position >= queueSize - 1),
+    new ButtonBuilder().setCustomId(queueActionId(channelId, "remove", position, fingerprint))
+      .setLabel("Retirer").setEmoji("🗑️").setStyle(ButtonStyle.Danger),
   );
 }
