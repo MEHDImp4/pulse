@@ -49,6 +49,14 @@ export const status: CommandDefinition = {
         { name: "Latence Discord", value: formatPing(interaction.client.ws.ping), inline: true },
       );
 
+    const cache = players.cacheForGuild(interaction.guildId);
+    if (cache) {
+      embed.addFields({
+        name: "Préchargement de la file",
+        value: `${cache.ready}/${cache.queued} prêtes · ${cache.downloading} en téléchargement · ${cache.pending} en attente · ${cache.failed} indisponibles`,
+      });
+    }
+
     if (active.length === 0) {
       embed.setDescription("ℹ️ Aucune lecture en cours sur ce serveur.");
       await interaction.reply({ embeds: [embed] });
@@ -58,11 +66,17 @@ export const status: CommandDefinition = {
     const lines = active.slice(0, MAX_SESSIONS).map((player) => {
       const track = player.currentTrack?.title ?? "—";
       const ping = player.voicePing;
+      const diagnostic = player.diagnostics.snapshot();
+      const avg = diagnostic.transitions ? `${diagnostic.avgTransitionMs} ms` : "—";
+      const p95 = diagnostic.transitions ? `${diagnostic.p95TransitionMs} ms` : "—";
       return [
         `<#${player.channelId}> — **${player.state}**`,
         `> ${truncateTitle(track)}`,
         `> file ${player.queueSize} · 🔊 ${player.volume}% · 🎛️ ${FILTER_LABELS[player.filter]} · ♾️ ${player.autoplay ? "on" : "off"}`,
         `> ping ws ${formatPing(ping?.ws)} / udp ${formatPing(ping?.udp)}`,
+        `> transitions ${diagnostic.transitions} · moyenne ${avg} · p95 ${p95}`,
+        `> cache ${diagnostic.cacheHits} · streaming ${diagnostic.cacheMisses} · standby ${diagnostic.preloadHits}`,
+        `> récupérations ${diagnostic.stallRecoveries} · sauts sur blocage ${diagnostic.stallSkips} · échecs ${diagnostic.startFailures + diagnostic.playerErrors}`,
       ].join("\n");
     });
     if (active.length > MAX_SESSIONS) {
