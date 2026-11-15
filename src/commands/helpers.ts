@@ -68,8 +68,8 @@ export type PlaybackPrep =
  * in another channel of the same guild (Discord allows one voice channel per
  * guild per bot, so a second join would hijack the existing connection).
  *
- * Never replies: callers run this after deferring and render the single
- * response themselves, which keeps every path free of interaction races.
+ * Never replies: callers defer their interaction first. Playback starts are
+ * queued per guild with bounded waiting instead of rejected on contention.
  */
 export async function preparePlayback(
   interaction: ChatInputCommandInteraction | StringSelectMenuInteraction,
@@ -96,15 +96,17 @@ export async function preparePlayback(
     };
   }
 
-  const release = players.reservePlaybackStart(interaction.guildId, channel.id);
-  if (!release) {
-    return {
-      status: "error",
-      message: "❌ Une autre connexion ou commande de lecture est déjà en cours sur ce serveur. Réessaie.",
+  const admission = await players.waitForPlaybackStart(interaction.guildId, channel.id);
+  if (admission.status !== "ok") {
+    const messages = {
+      conflict: "❌ Le bot est déjà connecté à un autre salon vocal de ce serveur.",
+      busy: "❌ Trop de demandes musicales en attente sur ce serveur. Réessaie dans quelques instants.",
+      timeout: "❌ La file des commandes musicales met trop de temps à avancer. Réessaie.",
     };
+    return { status: "error", message: messages[admission.status] };
   }
 
-  return { status: "ok", channel, release };
+  return { status: "ok", channel, release: admission.release };
 }
 
 export type ReadPlayerResult =
