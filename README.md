@@ -178,7 +178,7 @@ Crossfade intentionally overlaps song boundaries; inaccurate track durations can
 
 ### Persistent Party Mode and interactive queue
 
-`/party mode:on` enables continuous round-robin fairness whenever tracks are added, removed or played. Each user may have **3 pending songs by default**; change this with `/party limite:5` (1–10). Already queued tracks are preserved and reordered; the cap applies only to future additions. Only DJ-authorized members can change Party Mode. `/party mode:off` restores ordinary manual queue ordering.
+`/party mode:on` enables continuous round-robin fairness whenever tracks are added, removed or played. Each user may have **3 pending songs by default**; change this with `/party limite:5` (1–10). Already queued tracks are preserved and reordered; the cap applies only to future additions. Only DJ-authorized members can change Party Mode. Single-track looping is disabled during Party Mode so other users' tracks can advance. `/party mode:off` restores ordinary manual queue ordering.
 
 `/queue` now includes a **track selector** on every page. DJs in the bot's voice channel can move the selected track up/down or remove it using private buttons. Stale selections are rejected, and manual reordering is disabled while Party Mode is active.
 
