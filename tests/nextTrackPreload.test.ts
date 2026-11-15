@@ -70,7 +70,9 @@ describe("NextTrackPreloader", () => {
 
   it("does not cache failed audio and falls back to a fresh stream", async () => {
     const dispose = vi.fn(async () => {});
-    const preload = new NextTrackPreloader(async () => { throw new Error("broken audio"); }, dispose);
+    const preload = new NextTrackPreloader(async (value: { id: number }) => {
+      if (value.id === 0) throw new Error("broken audio");
+    }, dispose);
     preload.warm("bad", async () => ({ id: 0 }));
     expect(await preload.take("bad", 20)).toBeUndefined();
     expect(dispose).toHaveBeenCalledWith({ id: 0 });
