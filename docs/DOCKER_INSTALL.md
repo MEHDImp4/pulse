@@ -191,7 +191,7 @@ Dans **Docker → Pulse-Discord-Music → Edit** :
 3. **Dashboard - Mot de passe local** : définir un mot de passe de
    **12 caractères minimum** (champ masqué).
 
-Laissez **Dashboard - Mode de connexion** sur `local`, puis cliquez sur
+Laissez **Dashboard - Mode de connexion** sur `auto` (ou choisissez `local` si une ancienne configuration OAuth est encore présente), puis cliquez sur
 **Apply**. Dans l'onglet Docker d'Unraid, utilisez le bouton
 **WebUI** de Pulse ou ouvrez `http://IP_UNRAID:PORT_CHOISI` dans
 un navigateur connecté au même réseau. Connectez-vous avec le mot de passe
