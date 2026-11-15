@@ -134,6 +134,8 @@ Définis `DISCORD_GUILD_ID` pour enregistrer les commandes sur un seul serveur d
 
 Rejoins un salon vocal, puis utilise `/play` pour lancer une musique. Les commandes sont proposées directement dans l'interface de Discord.
 
+Les commandes de lecture (`/play`, `/playnext`, `/playlist`) utilisent des confirmations **privées et temporaires** (durée réglée par `AUTO_DELETE_SECONDS`, 1 seconde par défaut). Le panneau **Lecture en cours** est envoyé séparément dans le salon, reste accessible à tous avec ses boutons et est réutilisé au lieu d'être dupliqué. Pulse doit avoir les permissions **Envoyer des messages** et **Intégrer des liens** dans ce salon.
+
 | Commande | Fonction |
 |---|---|
 | `/play query:<titre ou URL>` | Recherche ou ajoute une musique ; reconnaît aussi certaines playlists |

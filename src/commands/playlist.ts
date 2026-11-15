@@ -31,7 +31,7 @@ export const playlist: CommandDefinition = {
     }
 
     // Acknowledge before any work so a slow lookup can never expire the token.
-    await interaction.deferReply();
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const prep = await preparePlayback(interaction, players);
     if (prep.status === "error") {

@@ -2,8 +2,9 @@ import { MessageFlags, type StringSelectMenuInteraction } from "discord.js";
 import { preparePlayback } from "../commands/helpers";
 import type { PlayerManager } from "../music/PlayerManager";
 import { searchSelections } from "../services/searchSelection";
-import { playbackControlsRows } from "../ui/controls";
-import { nowPlayingEmbed, queuedEmbed } from "../ui/embeds";
+import { publishNowPlaying } from "../services/nowPlaying";
+import { queuedEmbed } from "../ui/embeds";
+import { scheduleInteractionReplyDeletion } from "../utils/reply";
 
 export async function handleSearchSelection(
   interaction: StringSelectMenuInteraction, players: PlayerManager,
@@ -41,16 +42,12 @@ export async function handleSearchSelection(
     }
     const result = await player.add(track);
     if (result.started) {
+      await publishNowPlaying(interaction, player);
       await interaction.editReply("▶️ Lecture lancée.");
-      const msg = await interaction.followUp({
-        embeds: [nowPlayingEmbed(player)],
-        components: playbackControlsRows(player.channelId, player.state === "PAUSED"),
-        fetchReply: true,
-      });
-      player.setNowPlayingMessage(msg);
     } else {
       await interaction.editReply({ embeds: [queuedEmbed(track, { position: result.position })] });
     }
+    scheduleInteractionReplyDeletion(interaction);
   } catch (error) {
     await interaction.editReply(`❌ Impossible de lancer la musique : ${error instanceof Error ? error.message : "Erreur inconnue"}`);
   } finally {
