@@ -179,7 +179,7 @@ Attention : le crossfade raccourcit volontairement la séparation entre deux tit
 
 ### Mode soirée et file interactive
 
-Le **Party Mode** (`/party mode:on`) maintient un ordre équitable automatiquement lorsque des morceaux sont ajoutés, retirés ou joués. Chaque personne est limitée à **3 morceaux en attente par défaut** (`/party limite:5` pour ajuster de 1 à 10). Les titres déjà présents sont conservés et réorganisés, la limite s'appliquant uniquement aux nouveaux ajouts. Seuls les DJ peuvent activer/désactiver le mode ou changer la limite. `/party mode:off` restaure une gestion manuelle de la file.
+Le **Party Mode** (`/party mode:on`) maintient un ordre équitable automatiquement lorsque des morceaux sont ajoutés, retirés ou joués. Chaque personne est limitée à **3 morceaux en attente par défaut** (`/party limite:5` pour ajuster de 1 à 10). Les titres déjà présents sont conservés et réorganisés, la limite s'appliquant uniquement aux nouveaux ajouts. Seuls les DJ peuvent activer/désactiver le mode ou changer la limite. La boucle d'un seul morceau est automatiquement désactivée en mode soirée afin de ne pas bloquer les demandes. `/party mode:off` restaure une gestion manuelle de la file.
 
 Avec `/queue`, un **menu déroulant** permet désormais de sélectionner l'un des morceaux de la page. Les DJ présents dans le salon vocal peuvent ensuite le monter, le descendre ou le supprimer depuis un panneau privé. Une sélection devenue obsolète après changement de la file est refusée ; en Party Mode, le déplacement manuel est désactivé pour conserver l'équité.
 
