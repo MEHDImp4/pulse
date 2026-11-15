@@ -55,7 +55,10 @@ export const quality: CommandDefinition = {
 
       // FFmpeg filter changes only take effect on newly-created pipelines.
       // Reload the current song once, keeping its approximate position.
-      if (context.player.currentTrack) {
+      // Changing only the crossfade does not alter the current FFmpeg graph;
+      // do not restart a playing song just to change the future transition.
+      const requiresReload = normalize !== null || trimStartSilence !== null || fadeSeconds !== null;
+      if (requiresReload && context.player.currentTrack) {
         const position = Math.floor((context.player.playbackElapsedMs ?? 0) / 1_000);
         try {
           await context.player.seek(position);
