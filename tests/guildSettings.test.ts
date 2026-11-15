@@ -162,6 +162,7 @@ describe("audio quality settings", () => {
       partyMode: true, partyMaxPerUser: 10,
     });
     expect(sanitizeSettings({ partyMaxPerUser: -9 }).partyMaxPerUser).toBe(1);
+    expect(sanitizeSettings({ partyMode: true, loopMode: "track" }).loopMode).toBe("off");
   });
 
   it("persists normalization and silence settings across restarts", () => {
