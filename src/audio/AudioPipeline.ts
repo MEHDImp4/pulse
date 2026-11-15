@@ -100,6 +100,7 @@ export class AudioPipeline {
         normalize: options.normalize,
         trimStartSilence: !isLive && options.trimStartSilence,
         fadeSeconds: options.fadeSeconds,
+        skipFadeOut: options.skipFadeOut,
       },
     );
 
