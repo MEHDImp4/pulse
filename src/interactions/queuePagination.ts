@@ -1,6 +1,6 @@
 import { MessageFlags, type ButtonInteraction } from "discord.js";
 import type { PlayerManager } from "../music/PlayerManager";
-import { parseQueuePage, queueControlsRow } from "../ui/controls";
+import { parseQueuePage, queueControlsRow, queueSelectRow } from "../ui/controls";
 import { queueEmbed, queuePageCount } from "../ui/embeds";
 
 export async function handleQueuePagination(
@@ -26,7 +26,10 @@ export async function handleQueuePagination(
 
   await interaction.update({
     embeds: [queueEmbed(player, page)],
-    components: totalPages > 1 ? [queueControlsRow(player.channelId, page, totalPages)] : [],
+    components: [
+      ...(totalPages > 1 ? [queueControlsRow(player.channelId, page, totalPages)] : []),
+      ...(player.queue.size ? [queueSelectRow(player.channelId, player.queue.snapshot(), page)] : []),
+    ],
   });
   return true;
 }
