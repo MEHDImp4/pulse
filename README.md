@@ -135,6 +135,8 @@ Join a voice channel first, then try `/play`. Most actions work as native Discor
 
 Music commands (`/play`, `/playnext`, `/playlist`) use **private, short-lived confirmations** (controlled by `AUTO_DELETE_SECONDS`, default 1 second). The shared **Now Playing** card is posted separately, stays interactive, and is updated instead of creating duplicate cards. Pulse needs **Send Messages** and **Embed Links** permissions in the text channel.
 
+**Faster track transitions:** when the current song has a known duration and the next queue track exists, Pulse warms its audio stream **25 seconds before the end**. At most one next track is prepared per server, with process cleanup on queue changes, stops and failures. Preloading cannot guarantee zero silence with slow sources or unknown-duration tracks. Docker/Unraid settings: `PRELOAD_NEXT_TRACK`, `PRELOAD_LEAD_SECONDS`, `PRELOAD_TIMEOUT_MS`, and `PRELOAD_SWITCH_WAIT_MS`.
+
 | Command | What it does |
 |---|---|
 | `/play query:<title or URL>` | Search or queue a track; also recognizes supported playlists |
