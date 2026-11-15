@@ -16,7 +16,7 @@ import { AudioPipeline, type AudioPipelineResult } from "../audio/AudioPipeline"
 import { NextTrackPreloader } from "../audio/NextTrackPreloader";
 import type { QueueAudioCache } from "../audio/QueueAudioCache";
 import { waitForAudioBuffer } from "../audio/preloadReady";
-import type { FilterPreset } from "../audio/filters";
+import { sanitizeFadeSeconds, type FilterPreset } from "../audio/filters";
 import { waitForStatus } from "../audio/playbackWatchdog";
 import { evaluateStall } from "../audio/stallWatchdog";
 import { percentToGain } from "../audio/volume";
@@ -105,6 +105,9 @@ export class GuildPlayer {
   private _loopMode: LoopMode = "off";
   private _autoplay = false;
   private _filter: FilterPreset = "off";
+  private _normalize = false;
+  private _trimStartSilence = false;
+  private _fadeSeconds = 2;
   private _seekOffsetMs = 0;
   private suppressNextIdle = false;
   private startingTrack = false;
@@ -147,6 +150,9 @@ export class GuildPlayer {
     this._loopMode = initialSettings.loopMode;
     this._autoplay = initialSettings.autoplay;
     this._filter = initialSettings.filter;
+    this._normalize = initialSettings.normalize;
+    this._trimStartSilence = initialSettings.trimStartSilence;
+    this._fadeSeconds = initialSettings.fadeSeconds;
 
     this.audioPlayer.on(AudioPlayerStatus.Playing, () => {
       if (this.transitionStartedAt !== undefined && this._currentTrack) {
@@ -377,6 +383,25 @@ export class GuildPlayer {
   set filter(preset: FilterPreset) {
     this._filter = preset;
     this.onSettingsChange?.({ filter: preset });
+    this.nextTrackPreloader.cancel();
+    this.maybePreloadNext();
+  }
+
+  get quality(): Pick<GuildSettings, "normalize" | "trimStartSilence" | "fadeSeconds"> {
+    return {
+      normalize: this._normalize,
+      trimStartSilence: this._trimStartSilence,
+      fadeSeconds: this._fadeSeconds,
+    };
+  }
+
+  /** Quality changes are persisted atomically and invalidate mismatched standby audio. */
+  setQuality(patch: Partial<Pick<GuildSettings, "normalize" | "trimStartSilence" | "fadeSeconds">>): void {
+    if (patch.normalize !== undefined) this._normalize = patch.normalize === true;
+    if (patch.trimStartSilence !== undefined) this._trimStartSilence = patch.trimStartSilence === true;
+    if (patch.fadeSeconds !== undefined) this._fadeSeconds = sanitizeFadeSeconds(patch.fadeSeconds);
+    this.onSettingsChange?.(this.quality);
+    this.nextTrackPreloader.cancel();
     this.maybePreloadNext();
   }
 
@@ -391,7 +416,7 @@ export class GuildPlayer {
   }
 
   private preloadKey(track: Track, filter = this._filter): string {
-    return JSON.stringify([track.provider, track.id, track.webpageUrl, filter]);
+    return JSON.stringify([track.provider, track.id, track.webpageUrl, filter, this._normalize, this._trimStartSilence, this._fadeSeconds]);
   }
 
   /** Warm only the immediate successor, shortly before the current track ends. */
@@ -418,10 +443,15 @@ export class GuildPlayer {
       return;
     }
 
-    const filter = this._filter;
+    const options = {
+      filter: this._filter,
+      normalize: this._normalize,
+      trimStartSilence: this._trimStartSilence,
+      fadeSeconds: this._fadeSeconds,
+    };
     this.nextTrackPreloader.warm(
-      this.preloadKey(next, filter),
-      () => this.pipeline.create(next, this._volume, { filter }),
+      this.preloadKey(next, options.filter),
+      () => this.pipeline.create(next, this._volume, options),
     );
   }
 
@@ -989,6 +1019,9 @@ export class GuildPlayer {
             ? preloaded
             : await this.pipeline.create(track, this._volume, {
               filter: this._filter,
+              normalize: this._normalize,
+              trimStartSilence: this._trimStartSilence,
+              fadeSeconds: this._fadeSeconds,
               startSeconds,
               useCache: attempt === 1,
             });
