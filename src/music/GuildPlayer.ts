@@ -379,8 +379,10 @@ export class GuildPlayer {
   }
 
   set loopMode(mode: LoopMode) {
-    this._loopMode = mode;
-    this.onSettingsChange?.({ loopMode: mode });
+    // A repeating single track would prevent everyone else's songs from
+    // advancing in Party Mode, so never enable it while Party Mode is on.
+    this._loopMode = this._partyMode && mode === "track" ? "off" : mode;
+    this.onSettingsChange?.({ loopMode: this._loopMode });
     this.maybePreloadNext();
   }
 
@@ -434,6 +436,7 @@ export class GuildPlayer {
   /** Enables ongoing fairness; unlike /fairqueue it also affects later additions. */
   configureParty(enabled: boolean, maxPerUser = this._partyMaxPerUser): void {
     this._partyMode = enabled;
+    if (enabled && this._loopMode === "track") this.loopMode = "off";
     this._partyMaxPerUser = Number.isInteger(maxPerUser)
       ? Math.max(1, Math.min(10, maxPerUser))
       : this._partyMaxPerUser;
