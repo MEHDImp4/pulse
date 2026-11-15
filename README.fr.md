@@ -155,6 +155,7 @@ Le cache accélère fortement les transitions pour les titres entièrement tél�
 | `/pause`, `/resume`, `/skip`, `/stop` | Contrôle la lecture |
 | `/playnext`, `/previous`, `/remove`, `/shuffle`, `/clear` | Gère la file d'attente |
 | `/loop`, `/autoplay`, `/filter`, `/volume`, `/seek` | Personnalise l'écoute |
+| `/quality [normalize] [trim_silence] [fade] [crossfade]` | Qualité audio, silences, fondus et crossfade facultatif |
 | `/favorite add`, `list`, `play`, `remove` | Gère tes favoris |
 | `/myplaylist save`, `list`, `load`, `delete` | Sauvegarde et recharge tes playlists |
 | `/djrole add`, `remove`, `list` | Configure les rôles DJ |
@@ -166,6 +167,14 @@ Le cache accélère fortement les transitions pour les titres entièrement tél�
 Certaines actions affectant tous les utilisateurs nécessitent un rôle DJ configuré ou la permission Discord **Gérer le serveur**. La commande `/fairqueue` réorganise la file une fois ; ce n'est pas un mode permanent.
 
 Les résultats de `/search` sont accessibles uniquement à leur demandeur dans le salon vocal d'origine et expirent au bout de deux minutes.
+
+### Qualité audio et crossfade
+
+`/quality` règle la qualité sonore **pour le salon vocal** : `normalize:true` active l'égalisation de sonie via FFmpeg (indépendamment de Bass Boost, 8D, etc.), `trim_silence:true` retire les silences **au tout début** des musiques (pas au milieu), et `fade:0..5` règle les fondus de début/fin. Tous les réglages sont mémorisés et désactivables. **La normalisation et la suppression des silences sont désactivées par défaut** pour ne pas modifier les morceaux sans consentement. Le fondu historique reste à **2 secondes** par défaut.
+
+`/quality crossfade:3` active un **vrai chevauchement audio** de trois secondes : lorsque les deux pistes non live ont une durée connue et sont **déjà entièrement en cache**, FFmpeg mélange la fin de la première avec le début de la seconde. Un seul flux mélangé poursuit ensuite la lecture de la seconde. Le crossfade est **désactivé par défaut** ; il fonctionne avec le filtre `off` et la suppression des silences désactivée, et retombe automatiquement sur le préchargement classique si une piste manque, si la file change, si le réseau est lent ou si les durées ne sont pas fiables. Les commandes manuelles `/skip` et `/seek` conservent leur comportement standard.
+
+Attention : le crossfade raccourcit volontairement la séparation entre deux titres, et une durée de piste incorrecte peut provoquer un décalage. Tester d'abord `crossfade:2` ou `crossfade:3` sur une petite file de morceaux déjà en cache. Les fonctions d'atténuation et normalisation peuvent augmenter légèrement la charge CPU.
 
 ## Dashboard web facultatif
 
