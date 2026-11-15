@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RequestedBy, Track } from "../src/music/Track";
 import type { AudioProvider, AudioSource } from "../src/providers/AudioProvider";
-import { GuildPlayer } from "../src/music/GuildPlayer";
+import { GuildPlayer, peekNextTrack } from "../src/music/GuildPlayer";
 
 class StubProvider implements AudioProvider {
   readonly name = "youtube" as const;
@@ -53,5 +53,28 @@ describe("GuildPlayer", () => {
 
     player.setNowPlayingMessage(undefined);
     expect(player.nowPlayingIdle).toBe(false);
+  });
+});
+
+describe("peekNextTrack", () => {
+  const requestedBy = { id: "user", username: "Tester" };
+  const a: Track = { id: "a", title: "A", webpageUrl: "https://youtube.com/watch?v=a", provider: "youtube", requestedBy };
+  const b: Track = { id: "b", title: "B", webpageUrl: "https://youtube.com/watch?v=b", provider: "youtube", requestedBy };
+
+  it("prefers the next queued song in normal mode", () => {
+    expect(peekNextTrack(a, [b], "off")).toBe(b);
+  });
+
+  it("preloads the repeating song in track loop mode", () => {
+    expect(peekNextTrack(a, [b], "track")).toBe(a);
+  });
+
+  it("preloads the queue head in queue loop mode", () => {
+    expect(peekNextTrack(a, [b], "queue")).toBe(b);
+    expect(peekNextTrack(a, [], "queue")).toBe(a);
+  });
+
+  it("never guesses an autoplay song when the queue is empty", () => {
+    expect(peekNextTrack(a, [], "off")).toBeUndefined();
   });
 });
