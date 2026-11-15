@@ -113,6 +113,8 @@ export class GuildPlayer {
   private _trimStartSilence = false;
   private _fadeSeconds = 2;
   private _crossfadeSeconds = 0;
+  private _partyMode = false;
+  private _partyMaxPerUser = 3;
   private _seekOffsetMs = 0;
   private suppressNextIdle = false;
   private startingTrack = false;
@@ -165,6 +167,8 @@ export class GuildPlayer {
     this._trimStartSilence = initialSettings.trimStartSilence;
     this._fadeSeconds = initialSettings.fadeSeconds;
     this._crossfadeSeconds = initialSettings.crossfadeSeconds;
+    this._partyMode = initialSettings.partyMode;
+    this._partyMaxPerUser = initialSettings.partyMaxPerUser;
     this.updateCrossfadeTimer();
 
     this.audioPlayer.on(AudioPlayerStatus.Playing, () => {
@@ -424,8 +428,33 @@ export class GuildPlayer {
     this.notifyQueueChange();
   }
 
+  get partyMode(): boolean { return this._partyMode; }
+  get partyMaxPerUser(): number { return this._partyMaxPerUser; }
+
+  /** Enables ongoing fairness; unlike /fairqueue it also affects later additions. */
+  configureParty(enabled: boolean, maxPerUser = this._partyMaxPerUser): void {
+    this._partyMode = enabled;
+    this._partyMaxPerUser = Number.isInteger(maxPerUser)
+      ? Math.max(1, Math.min(10, maxPerUser))
+      : this._partyMaxPerUser;
+    this.onSettingsChange?.({
+      partyMode: this._partyMode,
+      partyMaxPerUser: this._partyMaxPerUser,
+    });
+    this.notifyQueueChange();
+  }
+
+  private enforcePartyLimit(track: Track): void {
+    if (this._partyMode && this.queue.countByRequester(track.requestedBy.id) >= this._partyMaxPerUser) {
+      throw new Error(`Mode soirée : maximum ${this._partyMaxPerUser} titre(s) en attente par personne.`);
+    }
+  }
+
   /** Notifies the owner that the queue content changed (for persistence). */
   notifyQueueChange(): void {
+    if (this._partyMode && this.queue.size > 1) {
+      this.queue.fairQueue();
+    }
     try {
       this.onQueueChange?.(this);
     } catch (error) {
@@ -711,10 +740,13 @@ export class GuildPlayer {
         return { started: true, position: 0 };
       }
 
-      const position = this.queue.enqueue(track);
+      this.enforcePartyLimit(track);
+      this.queue.enqueue(track);
+      const position = this._partyMode ? 0 : this.queue.size;
       logger.info({ guild: this.guildId, track: track.title, position }, "Added to queue");
       this.notifyQueueChange();
-      return { started: false, position };
+      return { started: false, position: this._partyMode
+        ? this.queue.snapshot().indexOf(track) + 1 : position };
     });
   }
 
@@ -728,10 +760,12 @@ export class GuildPlayer {
         return { started: true, position: 0 };
       }
 
+      this.enforcePartyLimit(track);
       const position = this.queue.enqueueFront(track);
       logger.info({ guild: this.guildId, track: track.title }, "Queued next");
       this.notifyQueueChange();
-      return { started: false, position };
+      return { started: false, position: this._partyMode
+        ? this.queue.snapshot().indexOf(track) + 1 : position };
     });
   }
 
