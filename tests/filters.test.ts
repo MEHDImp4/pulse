@@ -78,6 +78,12 @@ describe("Audio quality options", () => {
     expect(buildFilterChain("off", 100, 0, { fadeSeconds: 42 })).toContain("d=5");
   });
 
+  it("preserves the full-volume tail when a true crossfade might begin", () => {
+    const chain = buildFilterChain("off", 120, 0, { fadeSeconds: 2, skipFadeOut: true });
+    expect(chain).toContain("afade=t=in");
+    expect(chain).not.toContain("afade=t=out");
+  });
+
   it("never adds a scheduled ending fade for unknown duration", () => {
     const chain = buildFilterChain("off", undefined, 0, {
       normalize: true, trimStartSilence: true, fadeSeconds: 2,
