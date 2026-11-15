@@ -257,7 +257,36 @@ export class QueueAudioCache {
     if (signal.aborted) controller.abort();
     try {
       timer = setTimeout(() => controller.abort(), this.timeoutMs);
-      const source = await this.provider.createSource(track);
+
+      // Providers may spend seconds resolving a source. Abort the job on
+      // queue changes/timeouts without occupying a download worker forever.
+      // If a provider resolves *after* cancellation, terminate its process
+      // so the orphaned download never keeps running in the background.
+      const sourcePromise = this.provider.createSource(track);
+      let adopted = false;
+      void sourcePromise.then((lateSource) => {
+        if (!adopted && controller.signal.aborted) {
+          if (lateSource.kind === "pipe" && lateSource.process.exitCode === null) {
+            lateSource.process.kill("SIGTERM");
+          } else if (lateSource.kind === "stream") {
+            lateSource.close();
+          }
+        }
+      }).catch(() => undefined);
+
+      let onAbort: (() => void) | undefined;
+      const cancelled = new Promise<never>((_resolve, reject) => {
+        onAbort = () => reject(new Error("Audio source preparation cancelled"));
+        controller.signal.addEventListener("abort", onAbort, { once: true });
+        if (controller.signal.aborted) onAbort();
+      });
+      let source: Awaited<ReturnType<AudioProvider["createSource"]>>;
+      try {
+        source = await Promise.race([sourcePromise, cancelled]);
+        adopted = true;
+      } finally {
+        if (onAbort) controller.signal.removeEventListener("abort", onAbort);
+      }
       if (source.kind !== "pipe") {
         if (source.kind === "stream") source.close();
         throw new Error("Cache supports downloaded audio streams only");
