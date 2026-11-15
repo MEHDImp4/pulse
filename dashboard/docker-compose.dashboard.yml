@@ -4,6 +4,8 @@
 services:
   bot:
     environment:
+      DASHBOARD_ENABLED: "true"
+      DASHBOARD_AUTH_MODE: "discord"
       DASHBOARD_PORT: "8080"
       DASHBOARD_BIND: "0.0.0.0"
     ports:
