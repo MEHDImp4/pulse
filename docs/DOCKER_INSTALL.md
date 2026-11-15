@@ -84,44 +84,46 @@ Cela évite de désinstaller accidentellement les commandes sur d'autres
 serveurs. L'apparition des commandes globales peut prendre un peu de temps
 après le premier enregistrement.
 
-## 3. Dashboard web facultatif et sécurisé
+## 3. Dashboard web facultatif
 
-Le bot peut fonctionner sans **aucun port entrant**.
+Le bot ne nécessite aucun port lorsque le dashboard est désactivé.
 
-Pour activer le dashboard de la phase 4, configurer dans `.env.docker` :
+**Sur Unraid, le mode local est le plus simple :** activez « Dashboard - Activer »,
+laissez le port Web sur `8090` (ou choisissez un autre port libre) et entrez
+un mot de passe unique d'au moins 12 caractères. Ouvrez ensuite
+`http://IP_UNRAID:8090` ou le bouton **WebUI** du conteneur.
+**Aucun OAuth2, nom de domaine ou proxy HTTPS n'est nécessaire pour le réseau local.**
+Le mot de passe donne le contrôle des serveurs Discord où le bot est installé :
+ne le partagez pas. En HTTP, utilisez uniquement un réseau personnel de confiance
+ou un tunnel privé ; ne faites **aucune redirection de port Internet** vers le dashboard.
+Lire le [mini-tutoriel Unraid](UNRAID_DASHBOARD.md).
+
+Pour un déploiement **public** en dehors du LAN, utiliser plutôt le
+mode `discord` avec OAuth2 Discord et un reverse proxy HTTPS.
+Dans `.env.docker` :
 
 ```env
+DASHBOARD_ENABLED=true
+DASHBOARD_AUTH_MODE=discord
 DASHBOARD_PORT=8080
 DASHBOARD_BIND=0.0.0.0
 DASHBOARD_PUBLIC_URL=https://pulse.example.com
 DASHBOARD_CLIENT_SECRET=VOTRE_OAUTH_CLIENT_SECRET
 ```
 
-Dans le Discord Developer Portal → **OAuth2 → Redirects**, ajouter l'URL
-exacte :
-
-```text
-https://pulse.example.com/oauth/callback
-```
-
-Puis utiliser l'overlay Compose :
+Dans **Discord Developer Portal → OAuth2 → Redirects**, déclarer exactement
+`https://pulse.example.com/oauth/callback` puis utiliser l'overlay :
 
 ```sh
 docker compose -f docker-compose.yml \
   -f dashboard/docker-compose.dashboard.yml up -d
 ```
 
-Par défaut, l'overlay rend le dashboard accessible sur
-`127.0.0.1:8080` **du serveur hôte**, pour être raccordé à un reverse proxy
-HTTPS (Caddy / Nginx / Nginx Proxy Manager). Ne jamais exposer directement
-le port HTTP sur Internet.
-
-Si le reverse proxy est dans un autre conteneur Docker, il ne peut pas
-joindre automatiquement le `127.0.0.1` de l'hôte. Les deux conteneurs doivent
-partager un réseau Docker ou disposer d'une liaison interne sécurisée.
-
-Le dashboard exige OAuth2 Discord et revérifie les droits de gestion du
-serveur pour chaque requête API. Ne pas utiliser une URL HTTP publique.
+L'overlay n'ouvre que `127.0.0.1:8080` sur l'hôte par défaut pour un
+proxy TLS local. Si le proxy se trouve dans un autre conteneur, connectez-le
+à un réseau Docker partagé. **Ne publiez pas directement un dashboard HTTP
+sur Internet.** Le mode OAuth2 vérifie les permissions de gestion de chaque
+serveur Discord, contrairement au mot de passe d'administrateur local.
 
 ## 4. Installation native Unraid (sans Docker Compose)
 
@@ -146,8 +148,8 @@ wget -q -O /boot/config/plugins/dockerMan/templates-user/my-pulse-discord-music.
 Ensuite, uniquement dans l'interface web : **Docker → Add Container →
 Template → Pulse-Discord-Music**.
 
-Renseigner seulement les deux champs requis :
-**Discord Bot Token** et **Discord Application ID**, puis cliquez sur
+Renseigner les deux champs indispensables au bot :
+**Discord Bot Token** et **Discord Application ID**. Le dashboard est facultatif ; puis cliquez sur
 **Apply/Create**. Le conteneur télécharge l'image, corrige les permissions
 d'AppData, exécute le bot avec un utilisateur non privilégié et enregistre
 automatiquement les slash commands. Aucun port n'est requis pour le bot.
@@ -157,7 +159,7 @@ automatiquement les slash commands. Aucun port n'est requis pour le bot.
 | Repository | `ghcr.io/mehdimp4/pulse:latest` |
 | AppData | `/mnt/user/appdata/pulse-discord-music` → `/data` |
 | DATA_DIR | `/data` |
-| Dashboard | désactivé (`DASHBOARD_PORT=0`) |
+| Dashboard | désactivé (`DASHBOARD_ENABLED=false`), port local 8090 si activé |
 | Permissions Linux | amorçage pour AppData, puis utilisateur `node` non privilégié |
 
 Pour récupérer une future version du template, relancer la commande
@@ -179,17 +181,37 @@ utilise donc le nom distinct **Pulse Discord Music**.
 Une fois approuvée, il suffira d'ouvrir **Apps**, chercher
 « Pulse Discord Music » et cliquer **Install**.
 
-### Dashboard sur Unraid
+### Dashboard sur Unraid (3 champs)
 
-Le dashboard OAuth2 est optionnel et reste désactivé par défaut.
-Pour l'activer, renseigner `DASHBOARD_PORT=8080`, `DASHBOARD_PUBLIC_URL`
-avec un domaine HTTPS et `DASHBOARD_CLIENT_SECRET`. Ajouter l'URL
-`https://votre-domaine/oauth/callback` dans Discord OAuth2 Redirects.
+Dans **Docker → Pulse-Discord-Music → Edit** :
 
-Le template **n'ouvre aucun port HTTP par défaut**. Configurer un
-réseau Docker partagé avec Nginx Proxy Manager / Caddy ou ajouter
-explicitement un mappage de port sécurisé, avec un reverse proxy TLS.
-Ne pas ouvrir directement le port du dashboard sur Internet.
+1. **Dashboard - Activer** : `true`.
+2. **Dashboard - Port Web (Unraid)** : `8090` ou un port disponible tel que `8095`.
+   Unraid publie ce port sur le **port interne fixe 8090** du conteneur.
+3. **Dashboard - Mot de passe local** : définir un mot de passe de
+   **12 caractères minimum** (champ masqué).
+
+Laissez **Dashboard - Mode de connexion** sur `local`, puis cliquez sur
+**Apply**. Dans l'onglet Docker d'Unraid, utilisez le bouton
+**WebUI** de Pulse ou ouvrez `http://IP_UNRAID:PORT_CHOISI` dans
+un navigateur connecté au même réseau. Connectez-vous avec le mot de passe
+défini ci-dessus. Le dashboard peut fonctionner sur le LAN sans Client Secret,
+sans Redirect OAuth Discord et sans domaine.
+
+Pour désactiver : **Edit → Dashboard - Activer = false → Apply**.
+La lecture musicale et les données AppData ne sont pas supprimées.
+
+**Important :** une installation déjà créée peut conserver les anciennes
+variables `DASHBOARD_PORT` ou paramètres de mappage. Pour obtenir les nouveaux
+champs, actualisez le template source et ouvrez **Edit** ; remplacez l'ancien
+port interne personnalisé par **8090** et utilisez le port hôte configurable.
+Unraid ne met pas forcément les champs d'un conteneur déjà créé à jour
+automatiquement. Ne supprimez jamais son répertoire AppData.
+
+Le mode local attribue l'administration de **tous les serveurs où Pulse est
+présent** à toute personne connaissant le mot de passe ; n'ouvrez pas ce
+port sur Internet. Pour une URL extérieure, passer à `discord` et suivre
+les étapes OAuth2 + HTTPS de la section 3.
 
 En cas de refus d'accès GHCR, le package est peut-être privé :
 aller sur GitHub → Packages → pulse → Package settings, puis rendre
