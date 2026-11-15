@@ -236,7 +236,15 @@ export class PlayerManager {
       },
       (changed) => {
         this.persistQueue(changed);
-        this.audioCache?.setQueue(guildId, changed.queue.snapshot());
+        // When crossfade is enabled, pre-cache the *currently playing* song
+        // as well as the queue: FFmpeg needs the tail of A and head of B.
+        const pending = changed.queue.snapshot();
+        this.audioCache?.setQueue(
+          guildId,
+          changed.quality.crossfadeSeconds > 0 && changed.currentTrack
+            ? [changed.currentTrack, ...pending]
+            : pending,
+        );
       },
       (seed, exclude) => this.autoplayRelated(seed, exclude),
       this.audioCache,
