@@ -110,11 +110,14 @@ function staticFile(res: ServerResponse, file: "index.html" | "app.js" | "styles
 export function startDashboard(players: PlayerManager, client: Client): Server | undefined {
   if (!env.dashboardPort) return undefined;
   const isLocal = env.dashboardAuthMode === "local";
-  if (isLocal && !env.dashboardPassword) {
-    throw new Error("DASHBOARD_PASSWORD required when local dashboard is enabled");
+  if (isLocal && (!env.dashboardPassword || env.dashboardPassword.length < 12 ||
+      Buffer.byteLength(env.dashboardPassword, "utf8") > 256)) {
+    logger.error("Local dashboard disabled: set a unique DASHBOARD_PASSWORD of 12 to 256 bytes");
+    return undefined; // Keep Discord music online even if the optional UI is misconfigured.
   }
   if (!isLocal && (!env.dashboardClientSecret || !env.dashboardPublicUrl)) {
-    throw new Error("DASHBOARD_CLIENT_SECRET and DASHBOARD_PUBLIC_URL required for Discord OAuth");
+    logger.error("OAuth dashboard disabled: DASHBOARD_CLIENT_SECRET and DASHBOARD_PUBLIC_URL are required");
+    return undefined;
   }
   const localAuth = isLocal ? new LocalDashboardAuth(env.dashboardPassword!) : undefined;
   const origin = new URL(isLocal ? "http://localhost" : env.dashboardPublicUrl!);
