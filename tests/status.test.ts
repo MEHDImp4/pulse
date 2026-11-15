@@ -37,6 +37,7 @@ describe("/status diagnostics", () => {
       queueSize: 2,
       volume: 75,
       filter: "off",
+      quality: { normalize: false, trimStartSilence: false, fadeSeconds: 2, crossfadeSeconds: 0 },
       autoplay: true,
       voicePing: { ws: 12, udp: 18 },
       diagnostics,
