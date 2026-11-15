@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction, Message } from "discord.js";
+import type { ChatInputCommandInteraction, Message, StringSelectMenuInteraction } from "discord.js";
 import { env } from "../config/env";
 import { logger } from "./logger";
 
@@ -18,6 +18,19 @@ export function scheduleMessageDeletion(message: Message): void {
       logger.debug({ err: error, messageId: message.id }, "Auto-delete of bot message failed");
     });
   }, env.autoDeleteSeconds * 1000);
+}
+
+/** Clean up an ephemeral command acknowledgement without touching the public music panel. */
+export function scheduleInteractionReplyDeletion(
+  interaction: ChatInputCommandInteraction | StringSelectMenuInteraction,
+  delaySeconds = env.autoDeleteSeconds,
+): void {
+  if (delaySeconds <= 0) return;
+  setTimeout(() => {
+    void interaction.deleteReply().catch((error) => {
+      logger.debug({ err: error, interactionId: interaction.id }, "Ephemeral command cleanup failed");
+    });
+  }, delaySeconds * 1000);
 }
 
 /** Replies with a transient text message that is deleted after the configured delay. */
