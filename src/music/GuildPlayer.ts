@@ -420,7 +420,7 @@ export class GuildPlayer {
     this.nextTrackPreloader.cancel();
     this.crossfadePreloader.cancel();
     this.updateCrossfadeTimer();
-    this.maybePreloadNext();
+    this.notifyQueueChange();
   }
 
   /** Notifies the owner that the queue content changed (for persistence). */
