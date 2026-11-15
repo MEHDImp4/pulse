@@ -33,5 +33,9 @@
   <Config Name="Spotify Client Secret" Target="SPOTIFY_CLIENT_SECRET" Default="" Mode="" Description="Optionnel : identifiant secret de l'API Spotify" Type="Variable" Display="advanced" Required="false" Mask="true"/>
   <Config Name="Spotify OAuth Refresh Token" Target="SPOTIFY_REFRESH_TOKEN" Default="" Mode="" Description="Optionnel : playlists accessibles au compte Spotify OAuth" Type="Variable" Display="advanced" Required="false" Mask="true"/>
   <Config Name="Apple Music Developer Token" Target="APPLE_MUSIC_DEVELOPER_TOKEN" Default="" Mode="" Description="Optionnel : token de l'API du catalogue Apple Music" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Precharger la musique suivante" Target="PRELOAD_NEXT_TRACK" Default="true" Mode="" Description="Prepare la prochaine musique pendant la lecture actuelle pour reduire le silence entre pistes" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Prechargement - avance (secondes)" Target="PRELOAD_LEAD_SECONDS" Default="25" Mode="" Description="Commence a preparer le flux audio 25 secondes avant la fin de la piste" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Prechargement - delai source (ms)" Target="PRELOAD_TIMEOUT_MS" Default="12000" Mode="" Description="Temps maximal de preparation du flux de reserve" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Prechargement - attente transition (ms)" Target="PRELOAD_SWITCH_WAIT_MS" Default="500" Mode="" Description="Attente maximale pour finaliser un prechargement au passage a la piste suivante" Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="yt-dlp auto-update" Target="YTDLP_AUTO_UPDATE" Default="false" Mode="" Description="Laisser false : mettre a jour l'image Docker pour des versions testees" Type="Variable" Display="advanced" Required="false" Mask="false"/>
 </Container>
