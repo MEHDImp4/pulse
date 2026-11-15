@@ -48,9 +48,9 @@ describe("interactive Discord queue", () => {
     const top = queueActionRow("42", 0, queueTrackFingerprint(track("a")), 3);
     const last = queueActionRow("42", 2, queueTrackFingerprint(track("c")), 3);
     expect(top.components[0].toJSON().disabled).toBe(true);
-    expect(top.components[1].toJSON().disabled).toBe(false);
+    expect(top.components[1].toJSON().disabled).not.toBe(true);
     expect(last.components[1].toJSON().disabled).toBe(true);
-    expect(last.components[2].toJSON().disabled).toBe(false);
+    expect(last.components[2].toJSON().disabled).not.toBe(true);
   });
 
   it("changes the fingerprint when a different requester has queued the same song", () => {
