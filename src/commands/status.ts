@@ -76,7 +76,7 @@ export const status: CommandDefinition = {
         `> audio norm ${player.quality.normalize ? "on" : "off"} · intro ${player.quality.trimStartSilence ? "coupée" : "intacte"} · fondu ${player.quality.fadeSeconds}s · crossfade ${player.quality.crossfadeSeconds}s`,
         `> ping ws ${formatPing(ping?.ws)} / udp ${formatPing(ping?.udp)}`,
         `> transitions ${diagnostic.transitions} · moyenne ${avg} · p95 ${p95}`,
-        `> cache ${diagnostic.cacheHits} · streaming ${diagnostic.cacheMisses} · standby ${diagnostic.preloadHits}`,
+        `> cache ${diagnostic.cacheHits} · streaming ${diagnostic.cacheMisses} · standby ${diagnostic.preloadHits} · crossfades ${diagnostic.crossfadesStarted}`,
         `> récupérations ${diagnostic.stallRecoveries} · sauts sur blocage ${diagnostic.stallSkips} · échecs ${diagnostic.startFailures + diagnostic.playerErrors}`,
       ].join("\n");
     });
