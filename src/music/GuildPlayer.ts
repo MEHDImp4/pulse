@@ -482,7 +482,7 @@ export class GuildPlayer {
       this.crossfadePreloader.warm(key, async () => {
         const result = await this.pipeline.createCrossfade(
           current, next, plan, this._volume,
-          { normalize: this._normalize, fadeSeconds: this._fadeSeconds },
+          { normalize: this._normalize, fadeSeconds: 0 },
         );
         if (!result) throw new Error("Crossfade needs both songs already cached");
         return result;
@@ -506,6 +506,7 @@ export class GuildPlayer {
       normalize: this._normalize,
       trimStartSilence: this._trimStartSilence,
       fadeSeconds: this._fadeSeconds,
+      skipFadeOut: this._crossfadeSeconds > 0 && this._filter === "off" && !this._trimStartSilence,
     };
     this.nextTrackPreloader.warm(
       this.preloadKey(next, options.filter),
@@ -1145,6 +1146,7 @@ export class GuildPlayer {
               normalize: this._normalize,
               trimStartSilence: this._trimStartSilence,
               fadeSeconds: this._fadeSeconds,
+              skipFadeOut: this._crossfadeSeconds > 0 && this._filter === "off" && !this._trimStartSilence,
               startSeconds,
               useCache: attempt === 1,
             });
