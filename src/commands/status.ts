@@ -73,6 +73,7 @@ export const status: CommandDefinition = {
         `<#${player.channelId}> — **${player.state}**`,
         `> ${truncateTitle(track)}`,
         `> file ${player.queueSize} · 🔊 ${player.volume}% · 🎛️ ${FILTER_LABELS[player.filter]} · ♾️ ${player.autoplay ? "on" : "off"}`,
+        `> soirée ${player.partyMode ? "on" : "off"} · limite ${player.partyMaxPerUser} / personne`,
         `> audio norm ${player.quality.normalize ? "on" : "off"} · intro ${player.quality.trimStartSilence ? "coupée" : "intacte"} · fondu ${player.quality.fadeSeconds}s · crossfade ${player.quality.crossfadeSeconds}s`,
         `> ping ws ${formatPing(ping?.ws)} / udp ${formatPing(ping?.udp)}`,
         `> transitions ${diagnostic.transitions} · moyenne ${avg} · p95 ${p95}`,
