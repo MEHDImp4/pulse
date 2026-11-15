@@ -158,7 +158,8 @@ function renderStatus(data) {
   $("latency-p95").textContent = diag?.transitions ? `${diag.p95TransitionMs} ms` : "—";
   $("crossfade-count").textContent = String(diag?.crossfadesStarted ?? 0);
   $("recoveries-count").textContent = String(diag?.stallRecoveries ?? 0);
-  $(".queue-meta")?.setAttribute("data-party", p.partyMode ? "on" : "off");
+  document.querySelector(".queue-meta span").textContent = p.partyMode
+    ? "MODE SOIRÉE · ORDRE AUTOMATIQUE" : "GLISSE POUR RÉORGANISER";
   renderQueue(p.queue || []);
 }
 
