@@ -7,6 +7,7 @@ export interface PlaybackDiagnosticsSnapshot {
   lastTransitionMs?: number;
   slowTransitions: number;
   preloadHits: number;
+  crossfadesStarted: number;
   cacheHits: number;
   cacheMisses: number;
   stallRecoveries: number;
@@ -22,6 +23,7 @@ export interface PlaybackDiagnosticsSnapshot {
 export class PlaybackDiagnostics {
   private readonly gaps: number[] = [];
   private preloadHits = 0;
+  private crossfadesStarted = 0;
   private cacheHits = 0;
   private cacheMisses = 0;
   private stallRecoveries = 0;
@@ -48,6 +50,7 @@ export class PlaybackDiagnostics {
   }
 
   preloadUsed(): void { this.preloadHits++; }
+  crossfadeUsed(): void { this.crossfadesStarted++; }
   cacheUsed(): void { this.cacheHits++; }
   streamed(): void { this.cacheMisses++; }
   stallRecovered(): void { this.stallRecoveries++; }
@@ -66,6 +69,7 @@ export class PlaybackDiagnostics {
       lastTransitionMs: this.lastTransitionMs,
       slowTransitions: this.slowTransitions,
       preloadHits: this.preloadHits,
+      crossfadesStarted: this.crossfadesStarted,
       cacheHits: this.cacheHits,
       cacheMisses: this.cacheMisses,
       stallRecoveries: this.stallRecoveries,
