@@ -18,6 +18,7 @@ describe("PlaybackDiagnostics", () => {
       lastTransitionMs: 360,
       slowTransitions: 1,
       preloadHits: 0,
+      crossfadesStarted: 0,
       cacheHits: 0,
       cacheMisses: 0,
       stallRecoveries: 0,
@@ -32,6 +33,7 @@ describe("PlaybackDiagnostics", () => {
     diagnostics.cacheUsed();
     diagnostics.streamed();
     diagnostics.preloadUsed();
+    diagnostics.crossfadeUsed();
     diagnostics.stallRecovered();
     diagnostics.stallSkipped();
     diagnostics.startFailed();
@@ -40,6 +42,7 @@ describe("PlaybackDiagnostics", () => {
     expect(state.cacheHits).toBe(1);
     expect(state.cacheMisses).toBe(1);
     expect(state.preloadHits).toBe(1);
+    expect(state.crossfadesStarted).toBe(1);
     expect(state.stallRecoveries).toBe(1);
     expect(state.stallSkips).toBe(1);
     expect(state.startFailures).toBe(1);
