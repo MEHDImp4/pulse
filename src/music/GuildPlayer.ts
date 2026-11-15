@@ -29,6 +29,7 @@ import { listeningStats } from "./ListeningStats";
 import { DEFAULT_GUILD_SETTINGS, type GuildSettings } from "./GuildSettingsStore";
 import type { PlayerState } from "./PlayerState";
 import { QueueManager } from "./QueueManager";
+import { PlaybackDiagnostics } from "./PlaybackDiagnostics";
 import { toSessionId } from "./session";
 import type { Track } from "./Track";
 
@@ -77,6 +78,8 @@ export function peekNextTrack(
 
 export class GuildPlayer {
   readonly queue = new QueueManager(env.maxQueueSize);
+  readonly diagnostics = new PlaybackDiagnostics();
+  private transitionStartedAt?: number;
   readonly audioPlayer = createAudioPlayer({
     behaviors: { noSubscriber: NoSubscriberBehavior.Pause },
   });
@@ -146,6 +149,14 @@ export class GuildPlayer {
     this._filter = initialSettings.filter;
 
     this.audioPlayer.on(AudioPlayerStatus.Playing, () => {
+      if (this.transitionStartedAt !== undefined && this._currentTrack) {
+        const gapMs = performance.now() - this.transitionStartedAt;
+        this.diagnostics.transition(gapMs);
+        if (gapMs > 1_000) {
+          logger.warn({ guild: this.guildId, transitionMs: Math.round(gapMs) }, "Slow music transition");
+        }
+        this.transitionStartedAt = undefined;
+      }
       this._state = "PLAYING";
       this.maybePreloadNext();
       logger.info(
@@ -171,6 +182,7 @@ export class GuildPlayer {
         }
         logger.info({ guild: this.guildId }, "Audio player entered IDLE");
         const finished = this._currentTrack;
+        if (finished) this.transitionStartedAt = performance.now();
         // If a standby stream exists, terminate the previous FFmpeg/yt-dlp
         // processes concurrently with advancing the queue. Waiting for their
         // OS exit before playing already-buffered audio adds audible silence.
@@ -193,6 +205,7 @@ export class GuildPlayer {
     });
 
     this.audioPlayer.on("error", (error) => {
+      this.diagnostics.playerErrored();
       logger.error(
         { err: error, guild: this.guildId },
         "Audio player error",
@@ -257,12 +270,14 @@ export class GuildPlayer {
           "Playback stalled with no recovery left, skipping track",
         );
         this.bypassLoop = true;
+        this.diagnostics.stallSkipped();
         await this.killProcesses();
         this.audioPlayer.stop(true);
         return;
       }
 
       this.stallRecoveries += 1;
+      this.diagnostics.stallRecovered();
       const position = Math.floor((this.currentResource?.playbackDuration ?? 0) / 1000);
       logger.warn(
         { guild: this.guildId, track: track.title, position, recovery: this.stallRecoveries },
@@ -749,6 +764,7 @@ export class GuildPlayer {
   async stop(): Promise<void> {
     return this.runExclusive(async () => {
       this._state = "STOPPING";
+      this.transitionStartedAt = undefined;
       this.queue.clear();
       this._currentTrack = undefined;
       this.skipVotes.clear();
@@ -832,6 +848,7 @@ export class GuildPlayer {
   }
 
   private finishIdle(): void {
+    this.transitionStartedAt = undefined;
     this._state = "IDLE";
     this.notifyQueueChange();
     this.scheduleIdleDisconnect();
@@ -989,6 +1006,9 @@ export class GuildPlayer {
           // player would sit in BUFFERING forever and block the serial queue.
           await this.waitForPlaybackStart();
           recordTrackStarted();
+          if (attempt === 1 && preloaded) this.diagnostics.preloadUsed();
+          if (usedCache) this.diagnostics.cacheUsed();
+          else this.diagnostics.streamed();
           listeningStats.record(this.guildId, track);
           logger.info(
             {
@@ -1017,6 +1037,7 @@ export class GuildPlayer {
     this._currentTrack = undefined;
     this._state = "ERROR";
     recordTrackFailed();
+    this.diagnostics.startFailed();
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 
@@ -1080,6 +1101,7 @@ export class GuildPlayer {
   private async destroyInternal(): Promise<void> {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.transitionStartedAt = undefined;
     this.clearIdleTimer();
     this.clearEmptyChannelTimer();
     this.clearAutoplayRetry();
