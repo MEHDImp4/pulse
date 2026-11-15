@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import { replyTemporary } from "../utils/reply";
-import { queueControlsRow } from "../ui/controls";
+import { queueControlsRow, queueSelectRow } from "../ui/controls";
 import { queueEmbed, queuePageCount } from "../ui/embeds";
 import { resolveReadPlayer } from "./helpers";
 import type { CommandDefinition } from "./types";
@@ -23,7 +23,10 @@ export const queue: CommandDefinition = {
     const totalPages = queuePageCount(player);
     await interaction.reply({
       embeds: [queueEmbed(player, 0)],
-      components: totalPages > 1 ? [queueControlsRow(player.channelId, 0, totalPages)] : [],
+      components: [
+        ...(totalPages > 1 ? [queueControlsRow(player.channelId, 0, totalPages)] : []),
+        ...(player.queue.size ? [queueSelectRow(player.channelId, player.queue.snapshot(), 0)] : []),
+      ],
     });
   },
 };
