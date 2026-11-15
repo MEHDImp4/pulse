@@ -554,6 +554,7 @@ export class GuildPlayer {
       this.audioPlayer.stop(true);
       try {
         await this.startTrack(selected, 0, false, ready);
+        this.diagnostics.crossfadeUsed();
         logger.info({
           guild: this.guildId,
           overlapSeconds: plan.overlapSeconds,
