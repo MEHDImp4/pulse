@@ -1,7 +1,8 @@
 import type { ChatInputCommandInteraction, VoiceBasedChannel } from "discord.js";
 import type { PlayerManager } from "../music/PlayerManager";
-import { playbackControlsRows } from "../ui/controls";
-import { nowPlayingEmbed, playlistImportedEmbed } from "../ui/embeds";
+import { publishNowPlaying } from "../services/nowPlaying";
+import { playlistImportedEmbed } from "../ui/embeds";
+import { scheduleInteractionReplyDeletion } from "../utils/reply";
 
 /** Resolves a playlist URL and enqueues as many tracks as fit. Assumes the interaction is deferred. */
 export async function importPlaylist(
@@ -58,15 +59,11 @@ export async function importPlaylist(
       ],
     });
 
-    // Post the live now-playing card when this import actually started playback.
+    // The playlist summary is private/temporary; the shared player card stays public.
     if (wasIdle && player.currentTrack) {
-      const card = await interaction.followUp({
-        embeds: [nowPlayingEmbed(player)],
-        components: playbackControlsRows(player.channelId, player.state === "PAUSED"),
-        fetchReply: true,
-      });
-      player.setNowPlayingMessage(card);
+      await publishNowPlaying(interaction, player);
     }
+    scheduleInteractionReplyDeletion(interaction);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur inconnue";
     await interaction.editReply(`❌ Impossible d'importer la playlist : ${message}`);
