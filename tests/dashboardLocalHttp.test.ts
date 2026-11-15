@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Collection, type Client } from "discord.js";
 
 const mockEnv = vi.hoisted(() => ({
+  logLevel: "info",
   dashboardPort: 0,
   dashboardAuthMode: "local" as "local" | "discord",
   dashboardPassword: "very-strong-local-secret",
