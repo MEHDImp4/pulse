@@ -28,7 +28,7 @@ describe("persistent party queue mode", () => {
   it("rebalances after new song arrivals, preserving each requester's order", () => {
     const persist = vi.fn();
     const player = new GuildPlayer("party", "voice", new StubProvider(), () => {},
-      undefined, undefined, undefined, persist);
+      undefined, undefined, persist);
     player.queue.enqueue(track("a1", "a"));
     player.queue.enqueue(track("a2", "a"));
     player.queue.enqueue(track("b1", "b"));
