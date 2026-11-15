@@ -65,7 +65,8 @@ export function sanitizeSettings(input: unknown): GuildSettings {
     : DEFAULT_GUILD_SETTINGS.partyMaxPerUser;
 
   return {
-    volume, loopMode, autoplay, filter, normalize, trimStartSilence,
+    volume, loopMode: partyMode && loopMode === "track" ? "off" : loopMode,
+    autoplay, filter, normalize, trimStartSilence,
     fadeSeconds, crossfadeSeconds, partyMode, partyMaxPerUser,
   };
 }
