@@ -40,6 +40,17 @@ describe("persistent party queue mode", () => {
     expect(persist).toHaveBeenCalledWith({ partyMode: true, partyMaxPerUser: 2 });
   });
 
+  it("prevents a repeating single track from blocking everyone's queue", () => {
+    const player = new GuildPlayer("party", "voice", new StubProvider(), () => {});
+    player.loopMode = "track";
+    player.configureParty(true, 3);
+    expect(player.loopMode).toBe("off");
+    player.loopMode = "track";
+    expect(player.loopMode).toBe("off");
+    player.loopMode = "queue";
+    expect(player.loopMode).toBe("queue");
+  });
+
   it("turning party mode off preserves the queue without further reordering", () => {
     const player = new GuildPlayer("party", "voice", new StubProvider(), () => {});
     player.configureParty(true, 2);
