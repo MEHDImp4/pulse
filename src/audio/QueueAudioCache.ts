@@ -274,18 +274,19 @@ export class QueueAudioCache {
         }
       }).catch(() => undefined);
 
-      let onAbort: (() => void) | undefined;
+      let rejectLookup!: (reason: Error) => void;
       const cancelled = new Promise<never>((_resolve, reject) => {
-        onAbort = () => reject(new Error("Audio source preparation cancelled"));
-        controller.signal.addEventListener("abort", onAbort, { once: true });
-        if (controller.signal.aborted) onAbort();
+        rejectLookup = reject;
       });
+      const cancelLookup = (): void => rejectLookup(new Error("Audio source preparation cancelled"));
+      controller.signal.addEventListener("abort", cancelLookup, { once: true });
+      if (controller.signal.aborted) cancelLookup();
       let source: Awaited<ReturnType<AudioProvider["createSource"]>>;
       try {
         source = await Promise.race([sourcePromise, cancelled]);
         adopted = true;
       } finally {
-        if (onAbort) controller.signal.removeEventListener("abort", onAbort);
+        controller.signal.removeEventListener("abort", cancelLookup);
       }
       if (source.kind !== "pipe") {
         if (source.kind === "stream") source.close();
