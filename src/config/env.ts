@@ -66,6 +66,8 @@ export const env = {
   metadataMaxPending: intEnv("METADATA_MAX_PENDING", 64),
   voiceConnectionTimeoutMs: intEnv("VOICE_CONNECTION_TIMEOUT_MS", 20_000),
   commandCooldownSeconds: intEnv("COMMAND_COOLDOWN_SECONDS", 5),
+  playbackMaxPending: Math.max(1, intEnv("PLAYBACK_MAX_PENDING", 12)),
+  playbackWaitTimeoutMs: Math.max(1_000, intEnv("PLAYBACK_WAIT_TIMEOUT_MS", 30_000)),
   autoDeleteSeconds: intEnv("AUTO_DELETE_SECONDS", 1),
   nowPlayingLive: boolEnv("NOWPLAYING_LIVE", true),
   nowPlayingIntervalMs: Math.max(2_000, intEnv("NOWPLAYING_INTERVAL_MS", 5_000)),

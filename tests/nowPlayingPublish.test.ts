@@ -8,11 +8,12 @@ vi.mock("../src/ui/embeds", () => ({ nowPlayingEmbed: () => ({ description: "tes
 import { publishNowPlaying } from "../src/services/nowPlaying";
 
 function fakePlayer(existing?: unknown): GuildPlayer {
+  let current = existing;
   return {
-    nowPlayingMessage: existing,
+    get nowPlayingMessage() { return current; },
     sessionId: "test-session",
     guildId: "test-guild",
-    setNowPlayingMessage: vi.fn(),
+    setNowPlayingMessage: vi.fn((message: unknown) => { current = message; }),
   } as unknown as GuildPlayer;
 }
 
@@ -53,7 +54,7 @@ describe("publishNowPlaying", () => {
   });
 
   it("creates a replacement if the existing card was deleted", async () => {
-    const existing = { edit: vi.fn().mockRejectedValue(new Error("Unknown Message")) };
+    const existing = { edit: vi.fn().mockRejectedValue(Object.assign(new Error("Unknown Message"), { code: 10008 })) };
     const replacement = { id: "new-card" };
     const send = vi.fn().mockResolvedValue(replacement);
     const player = fakePlayer(existing);
@@ -62,6 +63,35 @@ describe("publishNowPlaying", () => {
 
     expect(send).toHaveBeenCalledOnce();
     expect(player.setNowPlayingMessage).toHaveBeenCalledWith(replacement);
+  });
+
+  it("never posts duplicate cards when two commands publish simultaneously", async () => {
+    let resolveSend!: (message: unknown) => void;
+    const pendingSend = new Promise((resolve) => { resolveSend = resolve; });
+    const card = { id: "shared", edit: vi.fn().mockResolvedValue(undefined) };
+    const send = vi.fn(() => pendingSend);
+    const player = fakePlayer();
+    const interaction = fakeInteraction(send);
+
+    const first = publishNowPlaying(interaction, player);
+    const second = publishNowPlaying(interaction, player);
+    expect(send).toHaveBeenCalledOnce();
+    resolveSend(card);
+    await Promise.all([first, second]);
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(card.edit).toHaveBeenCalledOnce();
+    expect(player.nowPlayingMessage).toBe(card);
+  });
+
+  it("does not spawn a duplicate on transient Discord edit failures", async () => {
+    const card = { edit: vi.fn().mockRejectedValue(new Error("rate limited")) };
+    const player = fakePlayer(card);
+    const send = vi.fn();
+    await expect(publishNowPlaying(fakeInteraction(send), player))
+      .rejects.toThrow("rate limited");
+    expect(send).not.toHaveBeenCalled();
+    expect(player.nowPlayingMessage).toBe(card);
   });
 
   it("reports a missing sendable channel without creating an ephemeral player panel", async () => {

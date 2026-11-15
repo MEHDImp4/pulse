@@ -49,9 +49,28 @@ export function playerSnapshot(player: GuildPlayer): NowPlayingSnapshot | undefi
 // Last rendered signature per session, so identical frames are not re-sent to
 // Discord (e.g. a paused card no longer issues a REST edit every second).
 const lastSignatures = new Map<string, string>();
-// Coordinate timer edits and immediate button-triggered edits for each session.
-const inFlight = new Set<string>();
+// Serialize edits and creation for each player. Concurrent commands, button
+// presses and timer ticks must not overwrite each other or duplicate cards.
+const cardOperations = new WeakMap<GuildPlayer, Promise<void>>();
 const MAX_SIGNATURES = 5_000;
+
+async function withCardLock<T>(player: GuildPlayer, operation: () => Promise<T>): Promise<T> {
+  const previous = cardOperations.get(player);
+  let release!: () => void;
+  const completed = new Promise<void>((resolve) => { release = resolve; });
+  cardOperations.set(player, completed);
+  if (previous) await previous;
+  try {
+    return await operation();
+  } finally {
+    if (cardOperations.get(player) === completed) cardOperations.delete(player);
+    release();
+  }
+}
+
+function isUnknownMessage(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === 10008);
+}
 
 function rememberSignature(sessionId: string, signature: string): void {
   lastSignatures.delete(sessionId);
@@ -80,115 +99,103 @@ export async function publishNowPlaying(
   interaction: ChatInputCommandInteraction | StringSelectMenuInteraction,
   player: GuildPlayer,
 ): Promise<void> {
-  const existing = player.nowPlayingMessage;
-  if (existing) {
-    try {
-      await existing.edit(buildPayload(player));
-      player.setNowPlayingMessage(existing);
-      lastSignatures.delete(player.sessionId);
-      return;
-    } catch (error) {
-      logger.debug({ err: error, guild: player.guildId }, "Unable to reuse existing now-playing card");
+  await withCardLock(player, async () => {
+    const existing = player.nowPlayingMessage;
+    if (existing) {
+      try {
+        await existing.edit(buildPayload(player));
+        player.setNowPlayingMessage(existing);
+        lastSignatures.delete(player.sessionId);
+        return;
+      } catch (error) {
+        // Transient network/rate-limit errors must never spawn a duplicate card.
+        if (!isUnknownMessage(error)) throw error;
+        logger.debug({ err: error, guild: player.guildId }, "Previous now-playing card was deleted");
+      }
     }
-  }
 
-  const channel = interaction.channel;
-  if (!channel?.isSendable()) {
-    throw new Error("Je ne peux pas envoyer le panneau musical dans ce salon.");
-  }
+    const channel = interaction.channel;
+    if (!channel?.isSendable()) {
+      throw new Error("Je ne peux pas envoyer le panneau musical dans ce salon.");
+    }
 
-  const message = await channel.send({
-    ...buildPayload(player),
-    allowedMentions: { parse: [] },
+    const message = await channel.send({
+      ...buildPayload(player),
+      allowedMentions: { parse: [] },
+    });
+    player.setNowPlayingMessage(message);
+    lastSignatures.delete(player.sessionId);
   });
-  player.setNowPlayingMessage(message);
-  lastSignatures.delete(player.sessionId);
 }
 
 /** Immediately re-renders the live now-playing panel (e.g. after a volume change). */
 export async function refreshNowPlaying(player: GuildPlayer): Promise<void> {
-  const message = player.nowPlayingMessage;
-  const snapshot = playerSnapshot(player);
-  if (!message || !snapshot) return;
+  await withCardLock(player, async () => {
+    const message = player.nowPlayingMessage;
+    const snapshot = playerSnapshot(player);
+    if (!message || !snapshot) return;
 
-  const key = player.sessionId;
-  const signature = renderSignature(snapshot);
-  if (lastSignatures.get(key) === signature || inFlight.has(key)) return;
+    const key = player.sessionId;
+    const signature = renderSignature(snapshot);
+    if (lastSignatures.get(key) === signature) return;
 
-  inFlight.add(key);
-  try {
-    await message.edit(buildPayload(player));
-    rememberSignature(key, signature);
-  } catch (error) {
-    logger.debug({ err: error, guild: player.guildId }, "Immediate now playing update failed");
-  } finally {
-    inFlight.delete(key);
-  }
+    try {
+      await message.edit(buildPayload(player));
+      rememberSignature(key, signature);
+    } catch (error) {
+      logger.debug({ err: error, guild: player.guildId }, "Immediate now playing update failed");
+      lastSignatures.delete(key);
+      if (isUnknownMessage(error) && player.nowPlayingMessage === message) player.setNowPlayingMessage(undefined);
+    }
+  });
 }
 
 /**
- * Periodically refreshes the live now-playing card. When the queue ends the
- * card is switched once to its idle placeholder (no components); it is deleted
- * when the player is destroyed (bot leaves the voice channel). A tick is
- * skipped while a previous edit for the same session is still in flight, and
- * while the rendered card would be identical (so a paused card is not rewritten
- * every second). Returns a stop function.
+ * Skip timer ticks while any command owns the player's card. Every edit uses
+ * the same lock, preventing stale timer updates and duplicate publications.
  */
 export function startNowPlayingUpdater(players: PlayerManager, intervalMs = 5_000): () => void {
-
   const timer = setInterval(() => {
     for (const player of players.activePlayers()) {
-      const message = player.nowPlayingMessage;
-      if (!message) continue;
+      if (!player.nowPlayingMessage || cardOperations.has(player)) continue;
 
-      const key = player.sessionId;
-      if (inFlight.has(key)) continue;
+      void withCardLock(player, async () => {
+        const message = player.nowPlayingMessage;
+        if (!message) return;
 
-      if (!player.currentTrack) {
-        if (!player.nowPlayingIdle) {
-          player.nowPlayingIdle = true;
-          lastSignatures.delete(key);
-          inFlight.add(key);
-          void message
-            .edit({ embeds: [nowPlayingEmbed(player)], components: [] })
-            .catch((error) => {
-              logger.debug({ err: error, guild: player.guildId }, "Now playing idle render failed");
-            })
-            .finally(() => inFlight.delete(key));
-        }
-        continue;
-      }
-
-      player.nowPlayingIdle = false;
-
-      if (player.state !== "PLAYING" && player.state !== "PAUSED") continue;
-
-      const snapshot = playerSnapshot(player);
-      if (!snapshot) continue;
-      const signature = renderSignature(snapshot);
-      if (lastSignatures.get(key) === signature) continue;
-
-      // Building the embed synchronously can throw on invalid remote URLs; a
-      // throw here would otherwise escape the setInterval and crash the process.
-      try {
-        const payload = buildPayload(player);
-        inFlight.add(key);
-        void message
-          .edit(payload)
-          .then(() => {
-            rememberSignature(key, signature);
-          })
-          .catch((error) => {
-            logger.debug({ err: error, guild: player.guildId }, "Now playing update failed");
+        const key = player.sessionId;
+        if (!player.currentTrack) {
+          if (player.nowPlayingIdle) return;
+          try {
+            await message.edit({ embeds: [nowPlayingEmbed(player)], components: [] });
+            player.nowPlayingIdle = true;
             lastSignatures.delete(key);
-            player.setNowPlayingMessage(undefined);
-          })
-          .finally(() => inFlight.delete(key));
-      } catch (error) {
+          } catch (error) {
+            logger.debug({ err: error, guild: player.guildId }, "Now playing idle render failed");
+            if (isUnknownMessage(error) && player.nowPlayingMessage === message) player.setNowPlayingMessage(undefined);
+          }
+          return;
+        }
+
+        player.nowPlayingIdle = false;
+        if (player.state !== "PLAYING" && player.state !== "PAUSED") return;
+
+        const snapshot = playerSnapshot(player);
+        if (!snapshot) return;
+        const signature = renderSignature(snapshot);
+        if (lastSignatures.get(key) === signature) return;
+
+        try {
+          await message.edit(buildPayload(player));
+          rememberSignature(key, signature);
+        } catch (error) {
+          logger.debug({ err: error, guild: player.guildId }, "Now playing update failed");
+          lastSignatures.delete(key);
+          if (isUnknownMessage(error) && player.nowPlayingMessage === message) player.setNowPlayingMessage(undefined);
+        }
+      }).catch((error) => {
         logger.debug({ err: error, guild: player.guildId }, "Now playing render failed");
-        lastSignatures.delete(key);
-        player.setNowPlayingMessage(undefined);
-      }
+      });
     }
   }, intervalMs);
 

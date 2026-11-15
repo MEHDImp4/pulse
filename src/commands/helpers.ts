@@ -37,20 +37,23 @@ export async function requireControlChannel(
   interaction: ChatInputCommandInteraction,
   players: PlayerManager,
 ): Promise<ControlContext | null> {
+  // These commands can wait for an in-flight stream/queue operation. Acknowledge
+  // immediately so Discord never expires the interaction while they wait.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   if (!interaction.guildId) {
-    await interaction.reply({ content: "❌ Cette commande doit être utilisée dans un serveur.", flags: MessageFlags.Ephemeral });
+    await interaction.editReply("❌ Cette commande doit être utilisée dans un serveur.");
     return null;
   }
 
   const channel = await memberVoiceChannel(interaction);
   if (!channel) {
-    await interaction.reply({ content: "❌ Rejoins d'abord un salon vocal.", flags: MessageFlags.Ephemeral });
+    await interaction.editReply("❌ Rejoins d'abord un salon vocal.");
     return null;
   }
 
   const player = players.get(interaction.guildId, channel.id);
   if (!player || !player.isConnected) {
-    await interaction.reply({ content: "❌ Le bot n'est pas connecté à ton salon vocal.", flags: MessageFlags.Ephemeral });
+    await interaction.editReply("❌ Le bot n'est pas connecté à ton salon vocal.");
     return null;
   }
 
@@ -68,8 +71,8 @@ export type PlaybackPrep =
  * in another channel of the same guild (Discord allows one voice channel per
  * guild per bot, so a second join would hijack the existing connection).
  *
- * Never replies: callers run this after deferring and render the single
- * response themselves, which keeps every path free of interaction races.
+ * Never replies: callers defer their interaction first. Playback starts are
+ * queued per guild with bounded waiting instead of rejected on contention.
  */
 export async function preparePlayback(
   interaction: ChatInputCommandInteraction | StringSelectMenuInteraction,
@@ -96,15 +99,17 @@ export async function preparePlayback(
     };
   }
 
-  const release = players.reservePlaybackStart(interaction.guildId, channel.id);
-  if (!release) {
-    return {
-      status: "error",
-      message: "❌ Une autre connexion ou commande de lecture est déjà en cours sur ce serveur. Réessaie.",
+  const admission = await players.waitForPlaybackStart(interaction.guildId, channel.id);
+  if (admission.status !== "ok") {
+    const messages = {
+      conflict: "❌ Le bot est déjà connecté à un autre salon vocal de ce serveur.",
+      busy: "❌ Trop de demandes musicales en attente sur ce serveur. Réessaie dans quelques instants.",
+      timeout: "❌ La file des commandes musicales met trop de temps à avancer. Réessaie.",
     };
+    return { status: "error", message: messages[admission.status] };
   }
 
-  return { status: "ok", channel, release };
+  return { status: "ok", channel, release: admission.release };
 }
 
 export type ReadPlayerResult =

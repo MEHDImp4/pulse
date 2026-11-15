@@ -196,6 +196,8 @@ Only two credentials are required: `DISCORD_TOKEN` and `DISCORD_CLIENT_ID`. Ever
 | `DISCORD_GUILD_ID` | Empty | Register slash commands in one Discord server (instead of globally) |
 | `DATA_DIR` | `/data` in Docker | Persistent queues, personal playlists, DJ roles and statistics |
 | `MAX_QUEUE_SIZE` | `100` | Maximum pending tracks |
+| `PLAYBACK_MAX_PENDING` | `12` | Maximum waiting music commands per Discord server |
+| `PLAYBACK_WAIT_TIMEOUT_MS` | `30000` | Maximum wait for playback admission, in milliseconds |
 | `PLAYLIST_MAX_ITEMS` | `50` | Tracks imported per playlist |
 | `AUTOPLAY_DEFAULT` | `true` | Automatically suggest related tracks |
 | `QUEUE_PERSIST` | `true` | Save and resume queues across restarts |

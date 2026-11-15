@@ -15,7 +15,7 @@ import { djRoleStore, memberRoleIds } from "../music/DjRoleStore";
 import { formatDuration } from "../utils/time";
 
 async function replyPrivate(interaction: ButtonInteraction, content: string): Promise<void> {
-  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  await interaction.editReply({ content });
 
   // Auto-delete transient confirmations, but keep errors readable.
   if (content.startsWith("❌")) return;
@@ -65,6 +65,10 @@ export async function handleMusicControl(
 ): Promise<boolean> {
   const parsed = parseMusicControl(interaction.customId);
   if (!parsed) return false;
+
+  // ACK before any queue lock, voice lookup or audio work. Under contention
+  // these operations can exceed Discord's 3-second interaction deadline.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   if (!interaction.guildId || !interaction.guild) {
     await replyPrivate(interaction, "❌ Ce bouton doit être utilisé dans un serveur.");
