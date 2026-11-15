@@ -14,6 +14,7 @@ import {
 import type { Message, VoiceBasedChannel } from "discord.js";
 import { AudioPipeline, type AudioPipelineResult } from "../audio/AudioPipeline";
 import { NextTrackPreloader } from "../audio/NextTrackPreloader";
+import { planCrossfade, type CrossfadePlan } from "../audio/crossfade";
 import type { QueueAudioCache } from "../audio/QueueAudioCache";
 import { waitForAudioBuffer } from "../audio/preloadReady";
 import { sanitizeFadeSeconds, type FilterPreset } from "../audio/filters";
@@ -86,7 +87,10 @@ export class GuildPlayer {
 
   private readonly pipeline: AudioPipeline;
   private readonly nextTrackPreloader: NextTrackPreloader<AudioPipelineResult>;
+  private readonly crossfadePreloader: NextTrackPreloader<AudioPipelineResult>;
   private preloadTimer?: NodeJS.Timeout;
+  private crossfadeTimer?: NodeJS.Timeout;
+  private crossfadePending = false;
   private connection?: VoiceConnection;
   private childProcesses: ChildProcess[] = [];
   private sourceCleanup?: () => void;
@@ -108,6 +112,7 @@ export class GuildPlayer {
   private _normalize = false;
   private _trimStartSilence = false;
   private _fadeSeconds = 2;
+  private _crossfadeSeconds = 0;
   private _seekOffsetMs = 0;
   private suppressNextIdle = false;
   private startingTrack = false;
@@ -142,6 +147,12 @@ export class GuildPlayer {
       Math.max(45_000, env.preloadLeadSeconds * 1_000 + 10_000),
       (error) => logger.debug({ err: error, guild: this.guildId }, "Audio preload failed"),
     );
+    this.crossfadePreloader = new NextTrackPreloader<AudioPipelineResult>(
+      (prepared, signal) => waitForAudioBuffer(prepared.resource, env.preloadTimeoutMs, signal),
+      (prepared) => this.disposePreloadedAudio(prepared),
+      Math.max(45_000, env.preloadLeadSeconds * 1_000 + 10_000),
+      (error) => logger.debug({ err: error, guild: this.guildId }, "Crossfade preparation unavailable"),
+    );
     if (env.preloadNextTrack) {
       this.preloadTimer = setInterval(() => this.maybePreloadNext(), 2_000);
       this.preloadTimer.unref();
@@ -153,6 +164,8 @@ export class GuildPlayer {
     this._normalize = initialSettings.normalize;
     this._trimStartSilence = initialSettings.trimStartSilence;
     this._fadeSeconds = initialSettings.fadeSeconds;
+    this._crossfadeSeconds = initialSettings.crossfadeSeconds;
+    this.updateCrossfadeTimer();
 
     this.audioPlayer.on(AudioPlayerStatus.Playing, () => {
       if (this.transitionStartedAt !== undefined && this._currentTrack) {
@@ -384,24 +397,29 @@ export class GuildPlayer {
     this._filter = preset;
     this.onSettingsChange?.({ filter: preset });
     this.nextTrackPreloader.cancel();
+    this.crossfadePreloader.cancel();
     this.maybePreloadNext();
   }
 
-  get quality(): Pick<GuildSettings, "normalize" | "trimStartSilence" | "fadeSeconds"> {
+  get quality(): Pick<GuildSettings, "normalize" | "trimStartSilence" | "fadeSeconds" | "crossfadeSeconds"> {
     return {
       normalize: this._normalize,
       trimStartSilence: this._trimStartSilence,
       fadeSeconds: this._fadeSeconds,
+      crossfadeSeconds: this._crossfadeSeconds,
     };
   }
 
   /** Quality changes are persisted atomically and invalidate mismatched standby audio. */
-  setQuality(patch: Partial<Pick<GuildSettings, "normalize" | "trimStartSilence" | "fadeSeconds">>): void {
+  setQuality(patch: Partial<Pick<GuildSettings, "normalize" | "trimStartSilence" | "fadeSeconds" | "crossfadeSeconds">>): void {
     if (patch.normalize !== undefined) this._normalize = patch.normalize === true;
     if (patch.trimStartSilence !== undefined) this._trimStartSilence = patch.trimStartSilence === true;
     if (patch.fadeSeconds !== undefined) this._fadeSeconds = sanitizeFadeSeconds(patch.fadeSeconds);
+    if (patch.crossfadeSeconds !== undefined) this._crossfadeSeconds = sanitizeFadeSeconds(patch.crossfadeSeconds);
     this.onSettingsChange?.(this.quality);
     this.nextTrackPreloader.cancel();
+    this.crossfadePreloader.cancel();
+    this.updateCrossfadeTimer();
     this.maybePreloadNext();
   }
 
