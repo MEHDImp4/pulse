@@ -68,6 +68,9 @@ export function nowPlayingEmbed(player: GuildPlayer): EmbedBuilder {
   const footer = [STATE_LABELS[state], `File ${player.queueSize}`, `Boucle ${LOOP_LABELS[player.loopMode]}`];
   if (player.autoplay) footer.push("Autoplay");
   if (track.isLive) footer.push("Direct");
+  if (player.quality.normalize) footer.push("Volume égalisé");
+  if (player.quality.trimStartSilence) footer.push("Intro sans silence");
+  if (player.quality.crossfadeSeconds) footer.push(`Crossfade ${player.quality.crossfadeSeconds}s`);
 
   const embed = new EmbedBuilder()
     .setColor(stateColor(state))
