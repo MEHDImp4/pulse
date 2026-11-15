@@ -15,6 +15,9 @@ export interface GuildSettings {
   fadeSeconds: number;
   /** Optional overlap between two cached tracks; disabled by default. */
   crossfadeSeconds: number;
+  /** Optional ongoing round-robin queue with a pending-track cap per requester. */
+  partyMode: boolean;
+  partyMaxPerUser: number;
 }
 
 export const DEFAULT_GUILD_SETTINGS: GuildSettings = {
@@ -26,6 +29,8 @@ export const DEFAULT_GUILD_SETTINGS: GuildSettings = {
   trimStartSilence: false,
   fadeSeconds: 2,
   crossfadeSeconds: 0,
+  partyMode: false,
+  partyMaxPerUser: 3,
 };
 
 export const LOOP_MODES: readonly LoopMode[] = ["off", "track", "queue"];
@@ -54,7 +59,15 @@ export function sanitizeSettings(input: unknown): GuildSettings {
     ? sanitizeFadeSeconds(raw.crossfadeSeconds)
     : DEFAULT_GUILD_SETTINGS.crossfadeSeconds;
 
-  return { volume, loopMode, autoplay, filter, normalize, trimStartSilence, fadeSeconds, crossfadeSeconds };
+  const partyMode = typeof raw.partyMode === "boolean" ? raw.partyMode : DEFAULT_GUILD_SETTINGS.partyMode;
+  const partyMaxPerUser = typeof raw.partyMaxPerUser === "number" && Number.isInteger(raw.partyMaxPerUser)
+    ? Math.max(1, Math.min(10, raw.partyMaxPerUser))
+    : DEFAULT_GUILD_SETTINGS.partyMaxPerUser;
+
+  return {
+    volume, loopMode, autoplay, filter, normalize, trimStartSilence,
+    fadeSeconds, crossfadeSeconds, partyMode, partyMaxPerUser,
+  };
 }
 
 export function mergeSettings(base: GuildSettings, patch: Partial<GuildSettings>): GuildSettings {
