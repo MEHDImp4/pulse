@@ -136,6 +136,8 @@ Rejoins un salon vocal, puis utilise `/play` pour lancer une musique. Les comman
 
 Les commandes de lecture (`/play`, `/playnext`, `/playlist`) utilisent des confirmations **privées et temporaires** (durée réglée par `AUTO_DELETE_SECONDS`, 1 seconde par défaut). Le panneau **Lecture en cours** est envoyé séparément dans le salon, reste accessible à tous avec ses boutons et est réutilisé au lieu d'être dupliqué. Pulse doit avoir les permissions **Envoyer des messages** et **Intégrer des liens** dans ce salon.
 
+**Transitions musicales plus rapides :** lorsqu’un morceau possède une durée connue et qu’un suivant est en attente, Pulse commence à préparer son flux audio **25 secondes avant la fin**. Une seule piste est préchargée par serveur ; les flux abandonnés sont arrêtés automatiquement si la file est modifiée, si la lecture est interrompue ou si une préparation échoue. Le préchargement ne garantit pas zéro silence en cas de réseau lent ou de piste sans durée connue. Options Docker/Unraid : `PRELOAD_NEXT_TRACK`, `PRELOAD_LEAD_SECONDS`, `PRELOAD_TIMEOUT_MS` et `PRELOAD_SWITCH_WAIT_MS`.
+
 | Commande | Fonction |
 |---|---|
 | `/play query:<titre ou URL>` | Recherche ou ajoute une musique ; reconnaît aussi certaines playlists |

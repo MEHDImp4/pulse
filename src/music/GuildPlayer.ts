@@ -12,7 +12,9 @@ import {
   type VoiceConnection,
 } from "@discordjs/voice";
 import type { Message, VoiceBasedChannel } from "discord.js";
-import { AudioPipeline } from "../audio/AudioPipeline";
+import { AudioPipeline, type AudioPipelineResult } from "../audio/AudioPipeline";
+import { NextTrackPreloader } from "../audio/NextTrackPreloader";
+import { waitForAudioBuffer } from "../audio/preloadReady";
 import type { FilterPreset } from "../audio/filters";
 import { waitForStatus } from "../audio/playbackWatchdog";
 import { evaluateStall } from "../audio/stallWatchdog";
@@ -62,6 +64,16 @@ export function decideNext(
   return next ?? (finished && loopMode === "queue" ? finished : undefined);
 }
 
+/** Non-mutating preview of the next track, respecting the current loop mode. */
+export function peekNextTrack(
+  current: Track | undefined,
+  queued: readonly Track[],
+  mode: LoopMode,
+): Track | undefined {
+  if (current && mode === "track") return current;
+  return queued[0] ?? (mode === "queue" ? current : undefined);
+}
+
 export class GuildPlayer {
   readonly queue = new QueueManager(env.maxQueueSize);
   readonly audioPlayer = createAudioPlayer({
@@ -69,6 +81,8 @@ export class GuildPlayer {
   });
 
   private readonly pipeline: AudioPipeline;
+  private readonly nextTrackPreloader: NextTrackPreloader<AudioPipelineResult>;
+  private preloadTimer?: NodeJS.Timeout;
   private connection?: VoiceConnection;
   private childProcesses: ChildProcess[] = [];
   private sourceCleanup?: () => void;
@@ -114,6 +128,16 @@ export class GuildPlayer {
   ) {
     this._channelId = channelId;
     this.pipeline = new AudioPipeline(provider);
+    this.nextTrackPreloader = new NextTrackPreloader<AudioPipelineResult>(
+      (prepared, signal) => waitForAudioBuffer(prepared.resource, env.preloadTimeoutMs, signal),
+      (prepared) => this.disposePreloadedAudio(prepared),
+      Math.max(45_000, env.preloadLeadSeconds * 1_000 + 10_000),
+      (error) => logger.debug({ err: error, guild: this.guildId }, "Audio preload failed"),
+    );
+    if (env.preloadNextTrack) {
+      this.preloadTimer = setInterval(() => this.maybePreloadNext(), 2_000);
+      this.preloadTimer.unref();
+    }
     this._volume = initialSettings.volume;
     this._loopMode = initialSettings.loopMode;
     this._autoplay = initialSettings.autoplay;
@@ -121,6 +145,7 @@ export class GuildPlayer {
 
     this.audioPlayer.on(AudioPlayerStatus.Playing, () => {
       this._state = "PLAYING";
+      this.maybePreloadNext();
       logger.info(
         {
           guild: this.guildId,
@@ -144,7 +169,17 @@ export class GuildPlayer {
         }
         logger.info({ guild: this.guildId }, "Audio player entered IDLE");
         const finished = this._currentTrack;
-        await this.killProcesses();
+        // If a standby stream exists, terminate the previous FFmpeg/yt-dlp
+        // processes concurrently with advancing the queue. Waiting for their
+        // OS exit before playing already-buffered audio adds audible silence.
+        const oldCleanup = this.killProcesses();
+        if (this.nextTrackPreloader.key) {
+          void oldCleanup.catch((error) => {
+            logger.warn({ err: error, guild: this.guildId }, "Old audio process cleanup failed");
+          });
+        } else {
+          await oldCleanup;
+        }
         this.currentResource = undefined;
         this._currentTrack = undefined;
         this.skipVotes.clear();
@@ -306,6 +341,7 @@ export class GuildPlayer {
   set loopMode(mode: LoopMode) {
     this._loopMode = mode;
     this.onSettingsChange?.({ loopMode: mode });
+    this.maybePreloadNext();
   }
 
   get autoplay(): boolean {
@@ -324,6 +360,7 @@ export class GuildPlayer {
   set filter(preset: FilterPreset) {
     this._filter = preset;
     this.onSettingsChange?.({ filter: preset });
+    this.maybePreloadNext();
   }
 
   /** Notifies the owner that the queue content changed (for persistence). */
@@ -332,6 +369,55 @@ export class GuildPlayer {
       this.onQueueChange?.(this);
     } catch (error) {
       logger.warn({ err: error, guild: this.guildId }, "Queue change notification failed");
+    }
+    this.maybePreloadNext();
+  }
+
+  private preloadKey(track: Track, filter = this._filter): string {
+    return JSON.stringify([track.provider, track.id, track.webpageUrl, filter]);
+  }
+
+  /** Warm only the immediate successor, shortly before the current track ends. */
+  private maybePreloadNext(): void {
+    if (!env.preloadNextTrack || this.destroyed) return;
+    // Preserve the prepared pipeline while the serial queue is advancing after
+    // the Discord player entered Idle but before startTrack can claim it.
+    if (this.audioPlayer.state.status === AudioPlayerStatus.Idle && this._state === "PLAYING") return;
+
+    const current = this._currentTrack;
+    if (this._state !== "PLAYING" || !current || current.isLive || !current.duration || !this.currentResource) {
+      this.nextTrackPreloader.cancel();
+      return;
+    }
+
+    const remaining = current.duration - (this.playbackElapsedMs ?? 0) / 1_000;
+    if (remaining > env.preloadLeadSeconds) {
+      this.nextTrackPreloader.cancel();
+      return;
+    }
+    const next = peekNextTrack(current, this.queue.snapshot(), this._loopMode);
+    if (!next || next.isLive) {
+      this.nextTrackPreloader.cancel();
+      return;
+    }
+
+    const filter = this._filter;
+    this.nextTrackPreloader.warm(
+      this.preloadKey(next, filter),
+      () => this.pipeline.create(next, this._volume, { filter }),
+    );
+  }
+
+  private async disposePreloadedAudio(prepared: AudioPipelineResult): Promise<void> {
+    try {
+      prepared.cleanup?.();
+    } catch (error) {
+      logger.debug({ err: error, guild: this.guildId }, "Preloaded source cleanup failed");
+    }
+    try {
+      await terminateAll(prepared.processes);
+    } catch (error) {
+      logger.warn({ err: error, guild: this.guildId }, "Preloaded audio process cleanup failed");
     }
   }
 
@@ -524,6 +610,7 @@ export class GuildPlayer {
 
   async playDiagnosticTone(): Promise<void> {
     return this.runExclusive(async () => {
+      this.nextTrackPreloader.cancel();
       if (!this.connection || this.connection.state.status !== VoiceConnectionStatus.Ready) {
         throw new Error("Voice connection is not ready");
       }
@@ -602,7 +689,16 @@ export class GuildPlayer {
     return this.runExclusive(async () => {
       if (!this._currentTrack) return false;
       this.bypassLoop = true;
-      await this.killProcesses();
+      const oldCleanup = this.killProcesses();
+      if (this.nextTrackPreloader.key) {
+        // The next Opus stream is ready: begin the switch while the old
+        // process terminates, rather than making listeners wait for its exit.
+        void oldCleanup.catch((error) => {
+          logger.warn({ err: error, guild: this.guildId }, "Skipped audio process cleanup failed");
+        });
+        return this.audioPlayer.stop(true);
+      }
+      await oldCleanup;
       return this.audioPlayer.stop(true);
     });
   }
@@ -657,6 +753,7 @@ export class GuildPlayer {
       this.bypassLoop = true;
       this.autoplayCount = 0;
       this.clearAutoplayRetry();
+      this.nextTrackPreloader.cancel();
       await this.killProcesses();
       this.audioPlayer.stop(true);
       this._state = "IDLE";
@@ -836,6 +933,13 @@ export class GuildPlayer {
       throw new Error("Voice connection is not ready");
     }
 
+    // Claim the already-buffered next track before changing the current state,
+    // which would otherwise invalidate the pending preload.
+    const preloaded = startSeconds === 0 && env.preloadNextTrack
+      ? await this.nextTrackPreloader.take(this.preloadKey(track), env.preloadSwitchWaitMs)
+      : undefined;
+    this.nextTrackPreloader.cancel();
+
     this.clearIdleTimer();
     this._state = "BUFFERING";
     this._currentTrack = track;
@@ -846,7 +950,12 @@ export class GuildPlayer {
     this.stalledChecks = 0;
     this.rememberTrack(track);
     this.skipVotes.clear();
-    await this.killProcesses();
+    try {
+      await this.killProcesses();
+    } catch (error) {
+      if (preloaded) await this.disposePreloadedAudio(preloaded);
+      throw error;
+    }
     this.notifyQueueChange();
 
     const attempts = Math.max(1, env.maxStreamRetries + 1);
@@ -856,10 +965,16 @@ export class GuildPlayer {
     try {
       for (let attempt = 1; attempt <= attempts; attempt++) {
         try {
-          const { processes, resource, cleanup } = await this.pipeline.create(track, this._volume, {
-            filter: this._filter,
-            startSeconds,
-          });
+          const { processes, resource, cleanup } = attempt === 1 && preloaded
+            ? preloaded
+            : await this.pipeline.create(track, this._volume, {
+              filter: this._filter,
+              startSeconds,
+            });
+          // Volume may have changed while the standby pipeline was buffering.
+          if (resource.volume) {
+            resource.volume.setVolume(percentToGain(this._volume, env.volumeHeadroomDb, env.volumeRangeDb));
+          }
           this.sourceCleanup = cleanup;
           this.childProcesses = processes;
           this.currentResource = resource;
@@ -961,6 +1076,9 @@ export class GuildPlayer {
     this.clearIdleTimer();
     this.clearEmptyChannelTimer();
     this.clearAutoplayRetry();
+    this.nextTrackPreloader.cancel();
+    if (this.preloadTimer) clearInterval(this.preloadTimer);
+    this.preloadTimer = undefined;
     if (this.stallTimer) clearInterval(this.stallTimer);
     this.stallTimer = undefined;
     this.queue.clear();
