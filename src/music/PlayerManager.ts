@@ -12,6 +12,16 @@ import { QueueStore } from "./QueueStore";
 import { findConflictingSession, toSessionId } from "./session";
 import type { RequestedBy, Track } from "./Track";
 
+export type PlaybackAdmission =
+  | { status: "ok"; release: () => void }
+  | { status: "conflict" | "busy" | "timeout" };
+
+interface PlaybackWaiter {
+  channelId: string;
+  resolve: (result: PlaybackAdmission) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export class PlayerManager {
   private readonly players = new Map<string, GuildPlayer>();
   // VoiceStateUpdate is frequent. Index sessions by guild so a voice event
@@ -20,6 +30,7 @@ export class PlayerManager {
   // Reserve a guild while a playback command is resolving metadata/joining.
   // This closes the race between preparePlayback() and getOrCreate().
   private readonly playbackReservations = new Map<string, string>();
+  private readonly playbackWaiters = new Map<string, PlaybackWaiter[]>();
   private readonly settings: GuildSettingsStore;
   private readonly queueStore?: QueueStore;
 
@@ -72,8 +83,69 @@ export class PlayerManager {
     return () => {
       if (this.playbackReservations.get(guildId) === reservation) {
         this.playbackReservations.delete(guildId);
+        this.wakePlaybackWaiters(guildId);
       }
     };
+  }
+
+  /**
+   * FIFO admission for commands that resolve metadata, join voice and enqueue
+   * tracks. The interaction is deferred before reaching this method. A bounded
+   * queue avoids rejecting valid simultaneous /play requests or accumulating
+   * unlimited outstanding work when a provider is unresponsive.
+   */
+  async waitForPlaybackStart(guildId: string, channelId: string): Promise<PlaybackAdmission> {
+    if (this.findGuildConflict(guildId, channelId)) return { status: "conflict" };
+
+    const release = this.reservePlaybackStart(guildId, channelId);
+    if (release) return { status: "ok", release };
+
+    const pending = this.playbackWaiters.get(guildId) ?? [];
+    if (pending.length >= env.playbackMaxPending) return { status: "busy" };
+
+    return new Promise<PlaybackAdmission>((resolve) => {
+      const waiter: PlaybackWaiter = {
+        channelId,
+        resolve,
+        timer: setTimeout(() => {
+          const waiters = this.playbackWaiters.get(guildId);
+          if (!waiters) return;
+          const index = waiters.indexOf(waiter);
+          if (index < 0) return;
+          waiters.splice(index, 1);
+          if (waiters.length === 0) this.playbackWaiters.delete(guildId);
+          resolve({ status: "timeout" });
+        }, env.playbackWaitTimeoutMs),
+      };
+      pending.push(waiter);
+      this.playbackWaiters.set(guildId, pending);
+    });
+  }
+
+  /** Promote the oldest waiting request only after the previous one releases. */
+  private wakePlaybackWaiters(guildId: string): void {
+    const pending = this.playbackWaiters.get(guildId);
+    if (!pending) return;
+
+    while (pending.length > 0) {
+      const waiter = pending[0];
+      if (this.findGuildConflict(guildId, waiter.channelId)) {
+        pending.shift();
+        clearTimeout(waiter.timer);
+        waiter.resolve({ status: "conflict" });
+        continue;
+      }
+
+      const release = this.reservePlaybackStart(guildId, waiter.channelId);
+      if (!release) return;
+
+      pending.shift();
+      clearTimeout(waiter.timer);
+      if (pending.length === 0) this.playbackWaiters.delete(guildId);
+      waiter.resolve({ status: "ok", release });
+      return;
+    }
+    this.playbackWaiters.delete(guildId);
   }
 
   /** Returns the player currently attached to a voice channel, across guilds. */
