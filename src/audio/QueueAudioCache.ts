@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { once } from "node:events";
 import { createWriteStream } from "node:fs";
 import { mkdir, readdir, rm, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -13,6 +14,21 @@ interface CacheEntry {
   path: string;
   bytes: number;
   touched: number;
+}
+
+export interface GuildCacheSnapshot {
+  queued: number;
+  ready: number;
+  downloading: number;
+  pending: number;
+  failed: number;
+}
+
+export interface GlobalCacheSnapshot {
+  files: number;
+  bytes: number;
+  maxBytes: number;
+  activeDownloads: number;
 }
 
 export interface QueueAudioCacheOptions {
@@ -58,6 +74,32 @@ export class QueueAudioCache {
       logger.warn({ err: error }, "Audio queue cache unavailable");
       this.closed = true;
     });
+  }
+
+  /** Small snapshots: never include filenames, URLs or other servers' queue data. */
+  globalSnapshot(): GlobalCacheSnapshot {
+    return {
+      files: this.ready.size,
+      bytes: this.totalBytes,
+      maxBytes: this.maxBytes,
+      activeDownloads: this.active.size,
+    };
+  }
+
+  guildSnapshot(guildId: string): GuildCacheSnapshot {
+    const queue = this.desired.get(guildId) ?? [];
+    const summary: GuildCacheSnapshot = {
+      queued: queue.length, ready: 0, downloading: 0, pending: 0, failed: 0,
+    };
+    const now = Date.now();
+    for (const track of queue) {
+      const key = QueueAudioCache.key(track);
+      if (this.ready.has(key)) summary.ready++;
+      else if (this.active.has(key)) summary.downloading++;
+      else if ((this.failures.get(key) ?? 0) > now) summary.failed++;
+      else summary.pending++;
+    }
+    return summary;
   }
 
   /** Identical songs across guilds share one cached file and one download. */
@@ -215,7 +257,37 @@ export class QueueAudioCache {
     if (signal.aborted) controller.abort();
     try {
       timer = setTimeout(() => controller.abort(), this.timeoutMs);
-      const source = await this.provider.createSource(track);
+
+      // Providers may spend seconds resolving a source. Abort the job on
+      // queue changes/timeouts without occupying a download worker forever.
+      // If a provider resolves *after* cancellation, terminate its process
+      // so the orphaned download never keeps running in the background.
+      const sourcePromise = this.provider.createSource(track);
+      let adopted = false;
+      void sourcePromise.then((lateSource) => {
+        if (!adopted && controller.signal.aborted) {
+          if (lateSource.kind === "pipe" && lateSource.process.exitCode === null) {
+            lateSource.process.kill("SIGTERM");
+          } else if (lateSource.kind === "stream") {
+            lateSource.close();
+          }
+        }
+      }).catch(() => undefined);
+
+      let rejectLookup!: (reason: Error) => void;
+      const cancelled = new Promise<never>((_resolve, reject) => {
+        rejectLookup = reject;
+      });
+      const cancelLookup = (): void => rejectLookup(new Error("Audio source preparation cancelled"));
+      controller.signal.addEventListener("abort", cancelLookup, { once: true });
+      if (controller.signal.aborted) cancelLookup();
+      let source: Awaited<ReturnType<AudioProvider["createSource"]>>;
+      try {
+        source = await Promise.race([sourcePromise, cancelled]);
+        adopted = true;
+      } finally {
+        controller.signal.removeEventListener("abort", cancelLookup);
+      }
       if (source.kind !== "pipe") {
         if (source.kind === "stream") source.close();
         throw new Error("Cache supports downloaded audio streams only");
@@ -238,7 +310,14 @@ export class QueueAudioCache {
         signal: controller.signal,
       });
       if (controller.signal.aborted || this.closed || !bytes) throw new Error("Audio cache download interrupted");
-      if (sourceProcess.exitCode !== null && sourceProcess.exitCode !== 0) throw new Error("Provider returned invalid audio");
+      // stdout can end before yt-dlp reports its exit status. Do not promote
+      // incomplete/error responses to healthy cache entries on that race.
+      if (sourceProcess.exitCode === null && sourceProcess.signalCode === null) {
+        await once(sourceProcess, "close", { signal: controller.signal });
+      }
+      if (sourceProcess.exitCode !== 0 || sourceProcess.signalCode !== null) {
+        throw new Error("Provider returned invalid audio");
+      }
 
       // Atomic rename means playback never observes a partially downloaded file.
       await rename(temporary, output);

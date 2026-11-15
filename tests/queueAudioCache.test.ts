@@ -20,7 +20,7 @@ class FixtureProvider implements AudioProvider {
   readonly name = "youtube" as const;
   readonly calls: string[] = [];
   readonly payloads = new Map<string, Buffer>();
-  readonly createSource = vi.fn(async (song: Track): Promise<AudioSource> => {
+  createSource = vi.fn(async (song: Track): Promise<AudioSource> => {
     this.calls.push(song.id);
     const bytes = this.payloads.get(song.id) ?? Buffer.from("compressed-" + song.id);
     const proc = spawn(process.execPath, [
@@ -118,6 +118,67 @@ describe("QueueAudioCache", () => {
     caches.push(next);
     expect(await next.pathFor(a)).toBe(path);
     expect(provider.calls).toEqual(["reuse"]);
+  });
+
+  it("exposes only per-guild readiness, not another guild's queue", async () => {
+    const provider = new FixtureProvider();
+    const { cache } = await makeCache(provider);
+    const first = track("guild-a-track");
+    const second = track("guild-b-track");
+    cache.setQueue("a", [first]);
+    cache.setQueue("b", [second]);
+    await Promise.all([untilCached(cache, first), untilCached(cache, second)]);
+
+    expect(cache.guildSnapshot("a")).toEqual({
+      queued: 1, ready: 1, downloading: 0, pending: 0, failed: 0,
+    });
+    expect(cache.guildSnapshot("missing").queued).toBe(0);
+    expect(cache.globalSnapshot()).toMatchObject({
+      files: 2, activeDownloads: 0,
+    });
+    expect(cache.globalSnapshot().bytes).toBeGreaterThan(0);
+  });
+
+  it("rejects provider processes that exit with a nonzero code", async () => {
+    const provider = new FixtureProvider();
+    provider.createSource = vi.fn(async (): Promise<AudioSource> => {
+      const proc = spawn(process.execPath, [
+        "-e", "process.stdout.write('partial'); process.exitCode = 7",
+      ], { stdio: ["ignore", "pipe", "ignore"] });
+      return { kind: "pipe", stream: proc.stdout!, process: proc };
+    });
+    const { cache } = await makeCache(provider);
+    const broken = track("broken");
+    cache.setQueue("broken-guild", [broken]);
+    await vi.waitFor(() => {
+      expect(cache.guildSnapshot("broken-guild").failed).toBe(1);
+    }, { timeout: 2_000 });
+    expect(await cache.pathFor(broken)).toBeUndefined();
+    expect(cache.globalSnapshot().files).toBe(0);
+  });
+
+  it("frees download slots immediately after cancelling slow source resolution", async () => {
+    const provider = new FixtureProvider();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const realCreateSource = provider.createSource;
+    provider.createSource = vi.fn(async (song: Track): Promise<AudioSource> => {
+      if (song.id === "slow") await gate;
+      return realCreateSource(song);
+    });
+    const { cache } = await makeCache(provider, { concurrency: 1 });
+    const slow = track("slow");
+    const quick = track("quick");
+    cache.setQueue("guild", [slow]);
+    await vi.waitFor(() => expect(cache.globalSnapshot().activeDownloads).toBe(1));
+    cache.setQueue("guild", [quick]);
+    try {
+      await untilCached(cache, quick);
+      expect(cache.guildSnapshot("guild").ready).toBe(1);
+      expect(cache.globalSnapshot().activeDownloads).toBe(0);
+    } finally {
+      release();
+    }
   });
 
   it("invalidates a corrupt file so playback can revert to streaming", async () => {
