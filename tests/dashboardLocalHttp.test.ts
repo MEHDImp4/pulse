@@ -5,6 +5,7 @@ import { Collection, type Client } from "discord.js";
 
 const mockEnv = vi.hoisted(() => ({
   logLevel: "info",
+  dataDir: "/tmp",
   dashboardPort: 0,
   dashboardAuthMode: "local" as "local" | "discord",
   dashboardPassword: "very-strong-local-secret",
