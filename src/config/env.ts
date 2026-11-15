@@ -44,11 +44,12 @@ function sponsorblockModeEnv(name: string, fallback: SponsorblockMode): Sponsorb
 const legacyDashboardPort = intEnv("DASHBOARD_PORT", 0);
 const dashboardEnabled = boolEnv("DASHBOARD_ENABLED", legacyDashboardPort > 0);
 const configuredDashboardMode = process.env.DASHBOARD_AUTH_MODE?.trim().toLowerCase();
-if (configuredDashboardMode && !["local", "discord"].includes(configuredDashboardMode)) {
-  throw new Error("DASHBOARD_AUTH_MODE must be local or discord");
+if (configuredDashboardMode && !["local", "discord", "auto"].includes(configuredDashboardMode)) {
+  throw new Error("DASHBOARD_AUTH_MODE must be local, discord or auto");
 }
-const dashboardAuthMode = (configuredDashboardMode ||
-  (process.env.DASHBOARD_PUBLIC_URL?.trim() && process.env.DASHBOARD_CLIENT_SECRET?.trim()
+const dashboardAuthMode = (configuredDashboardMode && configuredDashboardMode !== "auto"
+  ? configuredDashboardMode
+  : (process.env.DASHBOARD_PUBLIC_URL?.trim() && process.env.DASHBOARD_CLIENT_SECRET?.trim()
     ? "discord" : "local")) as "local" | "discord";
 
 export const env = {
