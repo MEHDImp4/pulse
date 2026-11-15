@@ -37,20 +37,23 @@ export async function requireControlChannel(
   interaction: ChatInputCommandInteraction,
   players: PlayerManager,
 ): Promise<ControlContext | null> {
+  // These commands can wait for an in-flight stream/queue operation. Acknowledge
+  // immediately so Discord never expires the interaction while they wait.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   if (!interaction.guildId) {
-    await interaction.reply({ content: "❌ Cette commande doit être utilisée dans un serveur.", flags: MessageFlags.Ephemeral });
+    await interaction.editReply("❌ Cette commande doit être utilisée dans un serveur.");
     return null;
   }
 
   const channel = await memberVoiceChannel(interaction);
   if (!channel) {
-    await interaction.reply({ content: "❌ Rejoins d'abord un salon vocal.", flags: MessageFlags.Ephemeral });
+    await interaction.editReply("❌ Rejoins d'abord un salon vocal.");
     return null;
   }
 
   const player = players.get(interaction.guildId, channel.id);
   if (!player || !player.isConnected) {
-    await interaction.reply({ content: "❌ Le bot n'est pas connecté à ton salon vocal.", flags: MessageFlags.Ephemeral });
+    await interaction.editReply("❌ Le bot n'est pas connecté à ton salon vocal.");
     return null;
   }
 
