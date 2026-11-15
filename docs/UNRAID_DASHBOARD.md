@@ -18,8 +18,7 @@ pour utiliser le dashboard **sur un réseau local privé de confiance**.
    le port *interne* du conteneur est toujours `8090`.
 4. Définir **Dashboard - Mot de passe local** : 12 caractères minimum,
    idéalement un mot de passe long et unique.
-5. Garder **Dashboard - Mode de connexion** sur `local`
-   (dans les options avancées). Cliquer sur **Apply** et laisser
+5. Laisser **Dashboard - Mode de connexion** sur `auto` (mode local tant qu'aucun ancien secret OAuth n'est configuré). Si des identifiants OAuth sont déjà présents, choisir explicitement `local` dans les options avancées. Cliquer sur **Apply** et laisser
    le conteneur redémarrer.
 6. Ouvrir **Docker → Pulse-Discord-Music → WebUI**, ou saisir dans un navigateur :
 
