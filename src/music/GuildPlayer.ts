@@ -14,6 +14,7 @@ import {
 import type { Message, VoiceBasedChannel } from "discord.js";
 import { AudioPipeline, type AudioPipelineResult } from "../audio/AudioPipeline";
 import { NextTrackPreloader } from "../audio/NextTrackPreloader";
+import type { QueueAudioCache } from "../audio/QueueAudioCache";
 import { waitForAudioBuffer } from "../audio/preloadReady";
 import type { FilterPreset } from "../audio/filters";
 import { waitForStatus } from "../audio/playbackWatchdog";
@@ -125,9 +126,10 @@ export class GuildPlayer {
     private readonly onSettingsChange?: (patch: Partial<GuildSettings>) => void,
     private readonly onQueueChange?: (player: GuildPlayer) => void,
     private readonly onAutoplay?: (seed: Track, exclude: ReadonlySet<string>) => Promise<Track | undefined>,
+    private readonly audioCache?: QueueAudioCache,
   ) {
     this._channelId = channelId;
-    this.pipeline = new AudioPipeline(provider);
+    this.pipeline = new AudioPipeline(provider, audioCache);
     this.nextTrackPreloader = new NextTrackPreloader<AudioPipelineResult>(
       (prepared, signal) => waitForAudioBuffer(prepared.resource, env.preloadTimeoutMs, signal),
       (prepared) => this.disposePreloadedAudio(prepared),
@@ -964,13 +966,17 @@ export class GuildPlayer {
     this.startingTrack = true;
     try {
       for (let attempt = 1; attempt <= attempts; attempt++) {
+        let usedCache = false;
         try {
-          const { processes, resource, cleanup } = attempt === 1 && preloaded
+          const prepared = attempt === 1 && preloaded
             ? preloaded
             : await this.pipeline.create(track, this._volume, {
               filter: this._filter,
               startSeconds,
+              useCache: attempt === 1,
             });
+          const { processes, resource, cleanup } = prepared;
+          usedCache = prepared.fromCache === true;
           // Volume may have changed while the standby pipeline was buffering.
           if (resource.volume) {
             resource.volume.setVolume(percentToGain(this._volume, env.volumeHeadroomDb, env.volumeRangeDb));
@@ -996,6 +1002,7 @@ export class GuildPlayer {
           return;
         } catch (error) {
           lastError = error;
+          if (usedCache) this.audioCache?.invalidate(track);
           logger.warn(
             { err: error, guild: this.guildId, track: track.title, attempt, attempts },
             "Track start attempt failed",
