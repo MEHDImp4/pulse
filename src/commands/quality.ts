@@ -25,9 +25,16 @@ export const quality: CommandDefinition = {
         .setMinValue(0)
         .setMaxValue(5)
         .setRequired(false),
+    )
+    .addIntegerOption((option) =>
+      option.setName("crossfade")
+        .setDescription("Chevauchement de 2 pistes mises en cache (0 = désactivé, 1 à 5 s)")
+        .setMinValue(0)
+        .setMaxValue(5)
+        .setRequired(false),
     ),
   cooldownSeconds: 3,
-  usage: "/quality [normalize:true|false] [trim_silence:true|false] [fade:0..5]",
+  usage: "/quality [normalize:true|false] [trim_silence:true|false] [fade:0..5] [crossfade:0..5]",
   async execute(interaction, { players }) {
     const context = await requireControlChannel(interaction, players);
     if (!context) return;
@@ -35,13 +42,15 @@ export const quality: CommandDefinition = {
     const normalize = interaction.options.getBoolean("normalize");
     const trimStartSilence = interaction.options.getBoolean("trim_silence");
     const fadeSeconds = interaction.options.getInteger("fade");
-    const requested = normalize !== null || trimStartSilence !== null || fadeSeconds !== null;
+    const crossfadeSeconds = interaction.options.getInteger("crossfade");
+    const requested = normalize !== null || trimStartSilence !== null || fadeSeconds !== null || crossfadeSeconds !== null;
 
     if (requested) {
       context.player.setQuality({
         ...(normalize === null ? {} : { normalize }),
         ...(trimStartSilence === null ? {} : { trimStartSilence }),
         ...(fadeSeconds === null ? {} : { fadeSeconds }),
+        ...(crossfadeSeconds === null ? {} : { crossfadeSeconds }),
       });
 
       // FFmpeg filter changes only take effect on newly-created pipelines.
@@ -64,7 +73,11 @@ export const quality: CommandDefinition = {
       `Normalisation : **${settings.normalize ? "activée" : "désactivée"}**`,
       `Silences au début : **${settings.trimStartSilence ? "supprimés" : "conservés"}**`,
       `Fondus : **${settings.fadeSeconds} seconde(s)**`,
+      `Crossfade (morceaux en cache) : **${settings.crossfadeSeconds} seconde(s)**`,
     ];
+    if (settings.crossfadeSeconds > 0) {
+      description.push("ℹ️ Crossfade : exige 2 pistes déjà en cache, filtre désactivé et suppression des silences désactivée ; sinon transition classique.");
+    }
     await replyTemporary(interaction, `🎚️ Qualité audio du salon :\n${description.join("\n")}`);
   },
 };
