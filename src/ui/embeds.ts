@@ -67,6 +67,7 @@ export function nowPlayingEmbed(player: GuildPlayer): EmbedBuilder {
 
   const footer = [STATE_LABELS[state], `File ${player.queueSize}`, `Boucle ${LOOP_LABELS[player.loopMode]}`];
   if (player.autoplay) footer.push("Autoplay");
+  if (player.partyMode) footer.push(`Soirée · ${player.partyMaxPerUser}/pers.`);
   if (track.isLive) footer.push("Direct");
   if (player.quality.normalize) footer.push("Volume égalisé");
   if (player.quality.trimStartSilence) footer.push("Intro sans silence");
@@ -167,5 +168,6 @@ export function queueEmbed(player: GuildPlayer, page = 0): EmbedBuilder {
   const totalKnown = upcoming.reduce((sum, track) => sum + (track.duration ?? 0), 0);
   const footer = [`Page ${safePage + 1}/${totalPages}`];
   if (totalKnown > 0) footer.push(`~${formatDuration(totalKnown)}`);
+  if (player.partyMode) footer.push(`Mode soirée · max ${player.partyMaxPerUser} / pers.`);
   return embed.setFooter({ text: footer.join(" · ") });
 }
